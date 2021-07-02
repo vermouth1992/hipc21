@@ -71,10 +71,10 @@ private:
     int act_dim;
 public:
     MlpDQN(int obs_dim, int act_dim, int mlp_hidden, bool double_q, float q_lr, float gamma) {
-        this->q_network = std::make_shared<Mlp>(Mlp(obs_dim, act_dim, mlp_hidden));
-        this->target_q_network = std::make_shared<Mlp>(Mlp(obs_dim, act_dim, mlp_hidden));
-        this->optimizer = std::make_shared<torch::optim::Adam>(torch::optim::Adam(q_network.ptr()->parameters(),
-                                                                                  torch::optim::AdamOptions(q_lr)));
+        this->q_network = std::make_shared<Mlp>(obs_dim, act_dim, mlp_hidden);
+        this->target_q_network = std::make_shared<Mlp>(obs_dim, act_dim, mlp_hidden);
+        this->optimizer = std::make_shared<torch::optim::Adam>(q_network.ptr()->parameters(),
+                                                               torch::optim::AdamOptions(q_lr));
         this->obs_dim = obs_dim;
         this->act_dim = act_dim;
         this->double_q = double_q;
