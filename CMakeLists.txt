@@ -3,7 +3,9 @@ project(hipc21)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(LIBTORCH /home/chi/Downloads/libtorch-cxx11-abi-shared-with-deps-1.9.0+cpu/libtorch)
+set(DEVICE cu111)
+
+set(LIBTORCH /home/chi/Downloads/libtorch-cxx11-abi-shared-with-deps-1.9.0+${DEVICE}/libtorch)
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH}")
 

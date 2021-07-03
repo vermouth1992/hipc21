@@ -5,6 +5,8 @@
 #ifndef HIPC21_FUNCTIONAL_H
 #define HIPC21_FUNCTIONAL_H
 
+#include <chrono>
+#include <utility>
 #include <torch/torch.h>
 
 template<class T>
@@ -60,5 +62,51 @@ struct Mlp : torch::nn::Module {
     }
 };
 
+
+class StopWatcher {
+public:
+    explicit StopWatcher(std::string name) : m_elapsed(0), m_name(std::move(name)) {
+
+    }
+
+    std::string name() const {
+        return m_name;
+    }
+
+    void reset() {
+        m_elapsed = 0;
+    }
+
+    void start() {
+        m_start_time = std::chrono::steady_clock::now();
+    }
+
+    void stop() {
+        auto end_time = std::chrono::steady_clock::now();
+        m_elapsed += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - m_start_time).count();
+    }
+
+    int64_t nanoseconds() const {
+        return m_elapsed;
+    }
+
+    double microseconds() const {
+        return (double) nanoseconds() / 1000.;
+    }
+
+    double milliseconds() const {
+        return (double) nanoseconds() / 1000000.;
+    }
+
+    double seconds() const {
+        return (double) nanoseconds() / 1000000000.;
+    }
+
+
+private:
+    std::string m_name;
+    int64_t m_elapsed;
+    std::chrono::steady_clock::time_point m_start_time;
+};
 
 #endif //HIPC21_FUNCTIONAL_H

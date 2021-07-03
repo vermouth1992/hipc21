@@ -53,7 +53,7 @@ public:
         optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs);
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1);
-        auto loss = torch::mse_loss(q_values, target_q_values.detach());
+        auto loss = torch::mse_loss(q_values, target_q_values);
         AT_ASSERT(!std::isnan(loss.template item<float>()));
         loss.backward();
         optimizer->step();
@@ -154,9 +154,20 @@ static void train_dqn(
     Gym::State test_s;
     std::vector<float> test_reward_result(num_test_episodes, 0.);
     std::vector<int64_t> test_length_result(num_test_episodes, 0);
+
+    // setup timers
+    StopWatcher env_step("env_step");
+    StopWatcher actor("actor");
+    StopWatcher buffer_insert("buffer_insert");
+    StopWatcher buffer_sampler("buffer_sampler");
+    StopWatcher learner("learner");
+
+
     for (int epoch = 1; epoch <= epochs; epoch++) {
         for (int step = 0; step < steps_per_epoch; step++) {
             // compute action
+            actor.start();
+
             std::unique_ptr<std::vector<float>> action;
             // copy observation
             auto current_obs = s.observation;
@@ -176,10 +187,17 @@ static void train_dqn(
                     action = std::make_unique<std::vector<float>>(action_space->sample());
                 }
             }
+            actor.stop();
+
+            env_step.start();
             // environment step
             env->step(*action, false, &s);
-            assert(s.observation.size() == observation_space->sample().size());
 
+            env_step.stop();
+
+            // TODO: need to see if it is true done or done due to reaching the maximum length.
+
+            buffer_insert.start();
             // convert data type
             auto action_tensor = torch::from_blob(action->data(), {(int64_t) action->size()});
             auto next_obs_tensor = torch::from_blob(s.observation.data(), {(int64_t) s.observation.size()});
@@ -194,14 +212,15 @@ static void train_dqn(
                                       {"rew",      reward_tensor},
                                       {"done",     done_tensor}
                               });
+            buffer_insert.stop();
 
             episode_rewards += s.reward;
             episode_length += 1;
             // handle terminal case
             if (s.done) {
-//                std::cout << "Episode reward: " << episode_rewards << " | " << "Episode length: " << episode_length
-//                          << std::endl;
+                env_step.start();
                 env->reset(&s);
+                env_step.stop();
                 episode_rewards = 0.;
                 episode_length = 0;
             }
@@ -210,11 +229,15 @@ static void train_dqn(
             if (total_steps >= update_after) {
                 if (total_steps % update_every == 0) {
                     for (int i = 0; i < update_every * update_per_step; i++) {
+                        buffer_sampler.start();
                         auto data = *buffer.sample();
+                        buffer_sampler.stop();
+                        learner.start();
                         agent.train_step(data["obs"], data["act"], data["next_obs"], data["rew"], data["done"]);
                         if (i % policy_delay == 0) {
                             agent.update_target(true);
                         }
+                        learner.stop();
                     }
                 }
 
@@ -251,6 +274,16 @@ static void train_dqn(
                   << "StdTestEpReward " << reward_result.second << " | " << "AverageTestEpLen " << length_result.first
                   << " | " << "StdTestEpLen " << length_result.second << std::endl;
     }
+
+    // print stop_watcher statistics
+//    for (auto &stop_watcher:stop_watchers) {
+//        std::cout << stop_watcher->name() << ": " << stop_watcher->nanoseconds() << std::endl;
+//    }
+    std::cout << env_step.name() << ": " << env_step.seconds() << std::endl;
+    std::cout << actor.name() << ": " << actor.seconds() << std::endl;
+    std::cout << buffer_insert.name() << ": " << buffer_insert.seconds() << std::endl;
+    std::cout << buffer_sampler.name() << ": " << buffer_sampler.seconds() << std::endl;
+    std::cout << learner.name() << ": " << learner.seconds() << std::endl;
 
 }
 
