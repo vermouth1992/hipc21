@@ -53,7 +53,7 @@ public:
         optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs);
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1);
-        auto loss = torch::mse_loss(q_values, target_q_values);
+        auto loss = torch::mse_loss(q_values, target_q_values.detach());
         AT_ASSERT(!std::isnan(loss.template item<float>()));
         loss.backward();
         optimizer->step();
@@ -158,7 +158,9 @@ static void train_dqn(
         for (int step = 0; step < steps_per_epoch; step++) {
             // compute action
             std::unique_ptr<std::vector<float>> action;
-            auto obs_tensor = torch::from_blob(s.observation.data(), {(int64_t) s.observation.size()});
+            // copy observation
+            auto current_obs = s.observation;
+            auto obs_tensor = torch::from_blob(current_obs.data(), {(int64_t) current_obs.size()});
             if (total_steps < start_steps) {
                 action = std::make_unique<std::vector<float>>(action_space->sample());
             } else {
