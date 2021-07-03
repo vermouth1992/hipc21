@@ -122,7 +122,9 @@ static void train_dqn(
         float gamma,
         float q_lr,
         float tau,
-        float epsilon_greedy
+        float epsilon_greedy,
+        // torch
+        torch::Device device
 ) {
     // setup environment
     boost::shared_ptr<Gym::Environment> env = client->make(env_id);
@@ -134,6 +136,7 @@ static void train_dqn(
     int64_t act_dim = action_space->discreet_n;
     // setup agent
     auto agent = MlpDQN(obs_dim, act_dim, mlp_hidden, double_q, q_lr, gamma, tau);
+    agent.to(device);
     // setup replay buffer
     ReplayBuffer::str_to_dataspec data_spec = {
             {"obs",      DataSpec({obs_dim}, torch::kFloat32)},
@@ -162,6 +165,9 @@ static void train_dqn(
     StopWatcher buffer_sampler("buffer_sampler");
     StopWatcher learner("learner");
 
+    std::vector<StopWatcher *> stop_watchers{&env_step, &actor, &buffer_insert, &buffer_sampler, &learner};
+
+    torch::Device cpu(torch::kCPU);
 
     for (int epoch = 1; epoch <= epochs; epoch++) {
         for (int step = 0; step < steps_per_epoch; step++) {
@@ -179,7 +185,7 @@ static void train_dqn(
                 float rand_num = torch::rand({}).item().toFloat();
                 if (rand_num > epsilon_greedy) {
                     // take agent action
-                    auto tensor_action = agent.act_single(obs_tensor).to(torch::kFloat32);  //
+                    auto tensor_action = agent.act_single(obs_tensor.to(device)).to(cpu).to(torch::kFloat32);  //
                     std::vector<float> vector_action(tensor_action.data_ptr<float>(),
                                                      tensor_action.data_ptr<float>() + tensor_action.numel());
                     action = std::make_unique<std::vector<float>>(vector_action);
@@ -202,7 +208,8 @@ static void train_dqn(
             auto action_tensor = torch::from_blob(action->data(), {(int64_t) action->size()});
             auto next_obs_tensor = torch::from_blob(s.observation.data(), {(int64_t) s.observation.size()});
             auto reward_tensor = torch::tensor({s.reward});
-            auto done_tensor = torch::tensor({s.done}, torch::TensorOptions().dtype(torch::kFloat32));
+            bool true_done = s.done & (!s.timeout);
+            auto done_tensor = torch::tensor({true_done}, torch::TensorOptions().dtype(torch::kFloat32));
 
             // store data to the replay buffer
             buffer.add_single({
@@ -233,7 +240,11 @@ static void train_dqn(
                         auto data = *buffer.sample();
                         buffer_sampler.stop();
                         learner.start();
-                        agent.train_step(data["obs"], data["act"], data["next_obs"], data["rew"], data["done"]);
+                        agent.train_step(data["obs"].to(device),
+                                         data["act"].to(device),
+                                         data["next_obs"].to(device),
+                                         data["rew"].to(device),
+                                         data["done"].to(device));
                         if (i % policy_delay == 0) {
                             agent.update_target(true);
                         }
@@ -254,7 +265,7 @@ static void train_dqn(
             int64_t test_episode_length = 0;
             while (true) {
                 auto obs_tensor = torch::from_blob(test_s.observation.data(), {(int64_t) test_s.observation.size()});
-                auto tensor_action = agent.act_single(obs_tensor).to(torch::kFloat32);  //
+                auto tensor_action = agent.act_single(obs_tensor.to(device)).to(cpu).to(torch::kFloat32);  //
                 std::vector<float> vector_action(tensor_action.data_ptr<float>(),
                                                  tensor_action.data_ptr<float>() + tensor_action.numel());
                 test_env->step(vector_action, false, &test_s);
@@ -276,14 +287,13 @@ static void train_dqn(
     }
 
     // print stop_watcher statistics
-//    for (auto &stop_watcher:stop_watchers) {
-//        std::cout << stop_watcher->name() << ": " << stop_watcher->nanoseconds() << std::endl;
-//    }
-    std::cout << env_step.name() << ": " << env_step.seconds() << std::endl;
-    std::cout << actor.name() << ": " << actor.seconds() << std::endl;
-    std::cout << buffer_insert.name() << ": " << buffer_insert.seconds() << std::endl;
-    std::cout << buffer_sampler.name() << ": " << buffer_sampler.seconds() << std::endl;
-    std::cout << learner.name() << ": " << learner.seconds() << std::endl;
+    double total = 0.;
+    for (auto &stop_watcher:stop_watchers) {
+        total += stop_watcher->seconds();
+    }
+    for (auto &stop_watcher:stop_watchers) {
+        std::cout << stop_watcher->name() << ": " << stop_watcher->seconds() / total * 100. << "%" << std::endl;
+    }
 
 }
 

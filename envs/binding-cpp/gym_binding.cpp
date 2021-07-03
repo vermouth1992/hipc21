@@ -252,6 +252,7 @@ namespace Gym {
             Json::Value ans = client->POST("/v1/envs/" + instance_id + "/step/", act_json.toStyledString());
             observation_parse(ans["observation"], save_state_here->observation);
             save_state_here->done = ans["done"].asBool();
+            save_state_here->timeout = ans["timeout"].asBool();
             save_state_here->reward = ans["reward"].asFloat();
         }
 

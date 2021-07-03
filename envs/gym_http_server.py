@@ -277,8 +277,9 @@ def env_step(instance_id):
     action = get_required_param(json, 'action')
     render = get_optional_param(json, 'render', False)
     [obs_jsonable, reward, done, info] = envs.step(instance_id, action, render)
+    timeout = info.get('TimeLimit.truncated', False)
     return jsonify(observation=obs_jsonable,
-                   reward=reward, done=done, info=info)
+                   reward=reward, done=done, info=info, timeout=timeout)
 
 
 @app.route('/v1/envs/<instance_id>/action_space/', methods=['GET'])
