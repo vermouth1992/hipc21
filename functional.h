@@ -7,6 +7,15 @@
 
 #include <torch/torch.h>
 
+template<class T>
+static std::pair<float, float> compute_mean_std(const std::vector<T> &v) {
+    float sum = std::accumulate(v.begin(), v.end(), 0.0);
+    float mean = sum / v.size();
+
+    float sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+    float stddev = std::sqrt(sq_sum / v.size() - mean * mean);
+    return std::make_pair(mean, stddev);
+}
 
 static void hard_update(const torch::nn::Module &target, const torch::nn::Module &source) {
     {

@@ -24,10 +24,11 @@ struct DataSpec {
 class ReplayBuffer {
 public:
     typedef std::map<std::string, torch::Tensor> str_to_tensor;
+    typedef std::map<std::string, DataSpec> str_to_dataspec;
 
-    explicit ReplayBuffer(uint capacity,
-                          const std::map<std::string, DataSpec> &data_spec,
-                          uint batch_size) : m_capacity(capacity), m_batch_size(batch_size) {
+    explicit ReplayBuffer(int64_t capacity,
+                          const str_to_dataspec &data_spec,
+                          int64_t batch_size) : m_capacity(capacity), m_batch_size(batch_size) {
         for (auto &it : data_spec) {
             auto name = it.first;
             auto shape = it.second.m_shape;
@@ -70,10 +71,12 @@ public:
     // add data samples
     void add_batch(const str_to_tensor &data) {
         int64_t batch_size = data.begin()->second.sizes()[0];
+        if (m_ptr + batch_size > capacity()) {
+            std::cout << "Reaches the end of the replay buffer" << std::endl;
+        }
         for (auto &it : data) {
             AT_ASSERT(batch_size == it.second.sizes()[0]);
             if (m_ptr + batch_size > capacity()) {
-                std::cout << "Reaches the end of the replay buffer" << std::endl;
                 m_storage[it.first].index_put_({Slice(m_ptr, None)},
                                                it.second.index({Slice(None, capacity() - m_ptr)}));
                 m_storage[it.first].index_put_({Slice(None, batch_size - (capacity() - m_ptr))},
@@ -100,14 +103,21 @@ protected:
     str_to_tensor m_storage;
     int64_t m_capacity;
     int64_t m_batch_size;
-    int64_t m_size;
-    int64_t m_ptr;
+    int64_t m_size{};
+    int64_t m_ptr{};
 };
 
 
 class UniformReplayBuffer : public ReplayBuffer {
+public:
+    explicit UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+                                 int64_t batch_size)
+            : ReplayBuffer(capacity, data_spec, batch_size) {
+
+    }
+
     std::unique_ptr<str_to_tensor> sample() override {
-        auto idx = torch::randint(size(), {m_batch_size});
+        auto idx = torch::randint(size(), {m_batch_size}, torch::TensorOptions().dtype(torch::kInt64));
         return this->operator[](idx);
     }
 };
