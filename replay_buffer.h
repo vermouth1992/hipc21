@@ -38,7 +38,12 @@ public:
     }
 
     // pure virtual function
-    virtual std::unique_ptr<str_to_tensor> sample() = 0;
+    virtual std::shared_ptr<torch::Tensor> generate_idx() const = 0;
+
+    std::unique_ptr<str_to_tensor> sample() {
+        auto idx = generate_idx();
+        return this->operator[](*idx);
+    }
 
     void reset() {
         m_size = 0;
@@ -116,14 +121,32 @@ public:
 
     }
 
-    std::unique_ptr<str_to_tensor> sample() override {
+    std::shared_ptr<torch::Tensor> generate_idx() const override {
         auto idx = torch::randint(size(), {m_batch_size}, torch::TensorOptions().dtype(torch::kInt64));
-        return this->operator[](idx);
+        return std::make_unique<torch::Tensor>(idx);
     }
 };
 
 class PrioritizedReplayBuffer : public ReplayBuffer {
+public:
+    explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+                                     int64_t batch_size)
+            : ReplayBuffer(capacity, data_spec, batch_size),
+              m_priority(torch::zeros({capacity}, torch::TensorOptions().dtype(torch::kFloat32))) {
 
+    }
+
+    std::shared_ptr<torch::Tensor> generate_idx() const override {
+        // generate index according to the priority
+        return nullptr;
+    }
+
+    void update_priority(const torch::Tensor &idx) {
+
+    }
+
+private:
+    torch::Tensor m_priority;
 };
 
 #endif //HIPC21_REPLAY_BUFFER_H

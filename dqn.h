@@ -54,7 +54,6 @@ public:
         auto q_values = this->q_network.forward(obs);
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1);
         auto loss = torch::mse_loss(q_values, target_q_values);
-        AT_ASSERT(!std::isnan(loss.template item<float>()));
         loss.backward();
         optimizer->step();
     }
@@ -162,10 +161,12 @@ static void train_dqn(
     StopWatcher env_step("env_step");
     StopWatcher actor("actor");
     StopWatcher buffer_insert("buffer_insert");
+    StopWatcher buffer_indexing("buffer_indexing");
     StopWatcher buffer_sampler("buffer_sampler");
     StopWatcher learner("learner");
 
-    std::vector<StopWatcher *> stop_watchers{&env_step, &actor, &buffer_insert, &buffer_sampler, &learner};
+    std::vector<StopWatcher *> stop_watchers{&env_step, &actor, &buffer_insert, &buffer_indexing,
+                                             &buffer_sampler, &learner};
 
     torch::Device cpu(torch::kCPU);
 
@@ -236,8 +237,11 @@ static void train_dqn(
             if (total_steps >= update_after) {
                 if (total_steps % update_every == 0) {
                     for (int i = 0; i < update_every * update_per_step; i++) {
+                        buffer_indexing.start();
+                        auto idx = buffer.generate_idx();
+                        buffer_indexing.stop();
                         buffer_sampler.start();
-                        auto data = *buffer.sample();
+                        auto data = *buffer[*idx];
                         buffer_sampler.stop();
                         learner.start();
                         agent.train_step(data["obs"].to(device),
