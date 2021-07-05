@@ -123,6 +123,9 @@ static void train_dqn(
         int64_t batch_size,
         int64_t num_test_episodes,
         int64_t seed,
+        // replay buffer
+        float alpha,
+        float initial_beta,
         int64_t replay_size,
         // agent parameters
         int64_t mlp_hidden,
@@ -154,7 +157,7 @@ static void train_dqn(
             {"done",     DataSpec({}, torch::kFloat32)},
     };
 
-    PrioritizedReplayBuffer buffer(replay_size, data_spec, batch_size, 0.7, 0.5);
+    PrioritizedReplayBuffer buffer(replay_size, data_spec, batch_size, alpha);
     // main training loop
     Gym::State s;
     env->reset(&s);
@@ -179,6 +182,8 @@ static void train_dqn(
                                              &buffer_sampler, &learner, &buffer_update_priority};
 
     torch::Device cpu(torch::kCPU);
+
+    LinearSchedule beta_scheduler(epochs * steps_per_epoch, 1.0, initial_beta);
 
     for (int epoch = 1; epoch <= epochs; epoch++) {
         for (int step = 0; step < steps_per_epoch; step++) {
@@ -252,7 +257,7 @@ static void train_dqn(
                         auto idx = buffer.generate_idx();
                         buffer_indexing.stop();
                         // get importance weights
-                        auto weights = buffer.get_weights(*idx);
+                        auto weights = buffer.get_weights(*idx, (float) beta_scheduler.value(total_steps));
                         // retrieve the actual data
                         buffer_sampler.start();
                         auto data = *buffer[*idx];

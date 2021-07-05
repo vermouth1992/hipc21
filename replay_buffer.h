@@ -131,11 +131,10 @@ public:
 class PrioritizedReplayBuffer : public ReplayBuffer {
 public:
     explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
-                                     int64_t batch_size, float alpha, float beta)
+                                     int64_t batch_size, float alpha)
             : ReplayBuffer(capacity, data_spec, batch_size),
               m_segment_tree(capacity),
               m_alpha(alpha),
-              m_beta(beta),
               m_max_priority(1.0),
               m_min_priority(1.0) {
 
@@ -148,22 +147,23 @@ public:
         return idx;
     }
 
-    std::shared_ptr<torch::Tensor> get_weights(const torch::Tensor &idx) const {
+    std::shared_ptr<torch::Tensor> get_weights(const torch::Tensor &idx, const float beta) const {
         auto weights = m_segment_tree.operator[](idx);
-        *weights = torch::pow(*weights / m_min_priority, -m_beta);
+        *weights = torch::pow(*weights * ((float) size() / m_segment_tree.reduce()), -beta);
+        *weights = *weights / torch::max(*weights);
         return weights;
     }
 
     void update_priorities(const torch::Tensor &idx, const torch::Tensor &priorities) {
-        auto new_priority = torch::abs(priorities + 1e-6);
+        auto new_priority = torch::pow(torch::abs(priorities + 1e-6), m_alpha);
         m_max_priority = std::max(m_max_priority, torch::max(new_priority).item().toFloat());
         m_min_priority = std::min(m_min_priority, torch::min(new_priority).item().toFloat());
-        m_segment_tree.set(idx, torch::pow(new_priority, m_alpha));
+        m_segment_tree.set(idx, new_priority);
     }
 
     void add_batch(const str_to_tensor &data) override {
         int64_t batch_size = data.begin()->second.sizes()[0];
-        auto priority = torch::pow(torch::ones({batch_size}) * m_max_priority, m_alpha);
+        auto priority = torch::ones({batch_size}) * m_max_priority;
         if (m_ptr + batch_size > capacity()) {
             std::cout << "Reaches the end of the replay buffer" << std::endl;
         }
@@ -197,7 +197,6 @@ public:
 private:
     SegmentTree m_segment_tree;
     float m_alpha;
-    float m_beta;
     float m_max_priority;
     float m_min_priority;
 };

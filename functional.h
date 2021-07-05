@@ -62,6 +62,49 @@ struct Mlp : torch::nn::Module {
     }
 };
 
+class Scheduler {
+    virtual double value(int64_t t) = 0;
+};
+
+class ConstantScheduler : public Scheduler {
+public:
+    explicit ConstantScheduler(double value) : m_value(value) {
+
+    }
+
+    double value(int64_t t) override {
+        return m_value;
+    }
+
+private:
+    double m_value;
+};
+
+
+class LinearSchedule : public Scheduler {
+public:
+    LinearSchedule(int64_t scheduleTimesteps, double finalP, double initialP)
+            : schedule_timesteps(scheduleTimesteps),
+              final_p(finalP),
+              initial_p(initialP) {
+
+    }
+
+    double value(int64_t t) override {
+        double fraction = std::min((double) t / (double) schedule_timesteps, 1.0);
+        return initial_p + fraction * (final_p - initial_p);
+    }
+
+private:
+    int64_t schedule_timesteps;
+    double final_p;
+    double initial_p;
+};
+
+
+class PiecewiseSchedule : public Scheduler {
+    // TODO
+};
 
 class StopWatcher {
 public:
