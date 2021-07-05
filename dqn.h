@@ -27,7 +27,8 @@ public:
                                               const torch::Tensor &act,
                                               const torch::Tensor &next_obs,
                                               const torch::Tensor &rew,
-                                              const torch::Tensor &done) {
+                                              const torch::Tensor &done,
+                                              const torch::Tensor &importance_weights) {
 
         // compute target values
         torch::Tensor target_q_values;
@@ -46,12 +47,13 @@ public:
         optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs);
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1);
-        auto loss = torch::mse_loss(q_values, target_q_values);
+        auto loss = torch::square(q_values - target_q_values); // (None,)
+        loss = torch::mean(loss * importance_weights);
         loss.backward();
         optimizer->step();
 
         str_to_tensor log_data{
-                {"abs_delta_q", torch::abs(q_values - target_q_values)}
+                {"abs_delta_q", torch::abs(q_values - target_q_values).detach()}
         };
         return std::make_shared<str_to_tensor>(log_data);
     }
@@ -152,7 +154,7 @@ static void train_dqn(
             {"done",     DataSpec({}, torch::kFloat32)},
     };
 
-    UniformReplayBuffer buffer(replay_size, data_spec, batch_size);
+    PrioritizedReplayBuffer buffer(replay_size, data_spec, batch_size, 0.7, 0.5);
     // main training loop
     Gym::State s;
     env->reset(&s);
@@ -170,10 +172,11 @@ static void train_dqn(
     StopWatcher buffer_insert("buffer_insert");
     StopWatcher buffer_indexing("buffer_indexing");
     StopWatcher buffer_sampler("buffer_sampler");
+    StopWatcher buffer_update_priority("buffer_update_priority");
     StopWatcher learner("learner");
 
     std::vector<StopWatcher *> stop_watchers{&env_step, &actor, &buffer_insert, &buffer_indexing,
-                                             &buffer_sampler, &learner};
+                                             &buffer_sampler, &learner, &buffer_update_priority};
 
     torch::Device cpu(torch::kCPU);
 
@@ -244,22 +247,32 @@ static void train_dqn(
             if (total_steps >= update_after) {
                 if (total_steps % update_every == 0) {
                     for (int i = 0; i < update_every * update_per_step; i++) {
+                        // generate index
                         buffer_indexing.start();
                         auto idx = buffer.generate_idx();
                         buffer_indexing.stop();
+                        // get importance weights
+                        auto weights = buffer.get_weights(*idx);
+                        // retrieve the actual data
                         buffer_sampler.start();
                         auto data = *buffer[*idx];
                         buffer_sampler.stop();
+                        // training
                         learner.start();
-                        agent.train_step(data["obs"].to(device),
-                                         data["act"].to(device),
-                                         data["next_obs"].to(device),
-                                         data["rew"].to(device),
-                                         data["done"].to(device));
+                        auto logs = agent.train_step(data["obs"].to(device),
+                                                     data["act"].to(device),
+                                                     data["next_obs"].to(device),
+                                                     data["rew"].to(device),
+                                                     data["done"].to(device),
+                                                     weights->to(device));
                         if (i % policy_delay == 0) {
                             agent.update_target(true);
                         }
                         learner.stop();
+                        // update priority
+                        buffer_update_priority.start();
+                        buffer.update_priorities(*idx, (*logs)["abs_delta_q"]);
+                        buffer_update_priority.stop();
                     }
                 }
 

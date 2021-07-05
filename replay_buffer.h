@@ -172,18 +172,23 @@ public:
             if (m_ptr + batch_size > capacity()) {
                 m_storage[it.first].index_put_({Slice(m_ptr, None)},
                                                it.second.index({Slice(None, capacity() - m_ptr)}));
-                m_segment_tree.set(torch::arange(m_ptr, capacity()),
-                                   priority.index({Slice(None, capacity() - m_ptr)}));
                 m_storage[it.first].index_put_({Slice(None, batch_size - (capacity() - m_ptr))},
                                                it.second.index({Slice(capacity() - m_ptr, None)}));
-                m_segment_tree.set(torch::arange(batch_size - (capacity() - m_ptr)),
-                                   priority.index({Slice(capacity() - m_ptr, None)}));
             } else {
                 m_storage[it.first].index_put_({Slice(m_ptr, m_ptr + batch_size)}, it.second);
-                auto index = torch::arange(m_ptr, m_ptr + batch_size);
-                m_segment_tree.set(index, priority);
             }
         }
+
+        if (m_ptr + batch_size > capacity()) {
+            m_segment_tree.set(torch::arange(m_ptr, capacity()),
+                               priority.index({Slice(None, capacity() - m_ptr)}));
+            m_segment_tree.set(torch::arange(batch_size - (capacity() - m_ptr)),
+                               priority.index({Slice(capacity() - m_ptr, None)}));
+        } else {
+            auto index = torch::arange(m_ptr, m_ptr + batch_size);
+            m_segment_tree.set(index, priority);
+        }
+
         m_ptr = (m_ptr + batch_size) % capacity();
         m_size = std::min(m_size + batch_size, capacity());
     }
