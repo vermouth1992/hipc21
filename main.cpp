@@ -10,6 +10,8 @@ int main(int argc, char **argv) {
     int epochs = std::stoi(argv[1]);
     std::string env_id = argv[2];
     try {
+//        torch::set_num_threads(1);
+        std::cout << torch::get_num_threads() << " " << torch::get_thread_num() << std::endl;
         torch::manual_seed(1);
 
         torch::DeviceType device_type = torch::kCPU;

@@ -6,22 +6,15 @@
 #define HIPC21_DQN_H
 
 #include <torch/torch.h>
-#include <boost/range/combine.hpp>
 #include <utility>
 #include "functional.h"
 #include "include/gym/gym.h"
 #include "replay_buffer.h"
 
 class DQN : public torch::nn::Module {
-protected:
-    torch::nn::AnyModule q_network;
-    torch::nn::AnyModule target_q_network;
-    float tau{};
-    bool double_q{};
-    float q_lr{};
-    float gamma{};
-    std::shared_ptr<torch::optim::Adam> optimizer;
 public:
+    typedef std::map<std::string, torch::Tensor> str_to_tensor;
+
     void update_target(bool soft) {
         if (soft) {
             soft_update(*target_q_network.ptr(), *q_network.ptr(), tau);
@@ -30,11 +23,11 @@ public:
         }
     }
 
-    void train_step(const torch::Tensor &obs,
-                    const torch::Tensor &act,
-                    const torch::Tensor &next_obs,
-                    const torch::Tensor &rew,
-                    const torch::Tensor &done) {
+    std::shared_ptr<str_to_tensor> train_step(const torch::Tensor &obs,
+                                              const torch::Tensor &act,
+                                              const torch::Tensor &next_obs,
+                                              const torch::Tensor &rew,
+                                              const torch::Tensor &done) {
 
         // compute target values
         torch::Tensor target_q_values;
@@ -56,6 +49,11 @@ public:
         auto loss = torch::mse_loss(q_values, target_q_values);
         loss.backward();
         optimizer->step();
+
+        str_to_tensor log_data{
+                {"abs_delta_q", torch::abs(q_values - target_q_values)}
+        };
+        return std::make_shared<str_to_tensor>(log_data);
     }
 
     torch::Tensor act_batch(const torch::Tensor &obs) {
@@ -69,6 +67,15 @@ public:
         auto act_batch = this->act_batch(obs_batch);
         return act_batch.index({0});
     }
+
+protected:
+    torch::nn::AnyModule q_network;
+    torch::nn::AnyModule target_q_network;
+    float tau{};
+    bool double_q{};
+    float q_lr{};
+    float gamma{};
+    std::shared_ptr<torch::optim::Adam> optimizer;
 };
 
 
