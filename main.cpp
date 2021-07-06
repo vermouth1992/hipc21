@@ -19,7 +19,7 @@ parse(int argc, char *argv[]) {
                 .allow_unrecognised_options()
                 .add_options()
                         ("help", "Print help")
-                        ("env_id", "Environment id", cxxopts::value<std::string>()->default_value("CartPole-v1"))
+                        ("env_id", "Environment id", cxxopts::value<std::string>())
                         ("epochs", "Number of epochs", cxxopts::value<int64_t>()->default_value("100"))
                         ("steps_per_epoch", "Number steps/epoch", cxxopts::value<int64_t>()->default_value("1000"))
                         ("start_steps", "Number of steps that take random actions",

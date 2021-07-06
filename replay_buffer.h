@@ -195,7 +195,7 @@ public:
 
 
 private:
-    SegmentTree m_segment_tree;
+    SegmentTreeCPP m_segment_tree;
     float m_alpha;
     float m_max_priority;
     float m_min_priority;
