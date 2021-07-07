@@ -59,9 +59,12 @@ public:
     }
 
     torch::Tensor act_batch(const torch::Tensor &obs) {
-        auto q_values = this->q_network.forward(obs); // shape (None, act_dim)
-        auto act = std::get<1>(torch::max(q_values, -1));
-        return act;
+        {
+            torch::NoGradGuard no_grad;
+            auto q_values = this->q_network.forward(obs); // shape (None, act_dim)
+            auto act = std::get<1>(torch::max(q_values, -1));
+            return act;
+        }
     }
 
     torch::Tensor act_single(const torch::Tensor &obs) {
@@ -324,6 +327,201 @@ static void train_dqn(
         std::cout << stop_watcher->name() << ": " << stop_watcher->seconds() / total * 100. << "%" << std::endl;
     }
 
+    std::cout << "Total execution time: " << total << " s" << std::endl;
 }
+
+
+struct ActorParam {
+    const boost::shared_ptr<Gym::Client> client;
+    std::string env_id;
+    std::shared_ptr<PrioritizedReplayBuffer> replay_buffer;
+    std::shared_ptr<MlpDQN> agent; // the agent should live on CPU
+    pthread_mutex_t *actor_mutex;
+    // used to determine when to exit
+    pthread_mutex_t *global_steps_mutex;
+    int64_t *global_steps;
+    int64_t max_global_steps;
+    int64_t start_steps;
+    float epsilon_greedy;
+};
+
+
+void *actor(void *params) {
+    // each actor has the client,
+    auto *actor_params = (ActorParam *) params;
+    auto client = actor_params->client;
+    auto env_id = actor_params->env_id;
+    auto replay_buffer = actor_params->replay_buffer;
+    auto agent = actor_params->agent;
+    auto actor_mutex = actor_params->actor_mutex;
+    auto global_steps = actor_params->global_steps;
+    auto global_steps_mutex = actor_params->global_steps_mutex;
+    auto max_global_steps = actor_params->max_global_steps;
+    auto epsilon_greedy = actor_params->epsilon_greedy;
+    auto start_steps = actor_params->start_steps;
+
+    boost::shared_ptr<Gym::Environment> env = client->make(env_id);
+    boost::shared_ptr<Gym::Space> action_space = env->action_space();
+    boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
+
+    int64_t global_steps_temp;
+    Gym::State s;
+    s.done = true;
+    // main loop
+    while (true) {
+        if (s.done) {
+            env->reset(&s);
+        }
+        std::unique_ptr<std::vector<float>> action;
+        // copy observation
+        auto current_obs = s.observation;
+        auto obs_tensor = torch::from_blob(current_obs.data(), {(int64_t) current_obs.size()});
+        // get global_steps
+        pthread_mutex_lock(global_steps_mutex);
+        global_steps_temp = *global_steps;
+        pthread_mutex_unlock(global_steps_mutex);
+
+        if (global_steps_temp < start_steps) {
+            action = std::make_unique<std::vector<float>>(action_space->sample());
+        } else {
+            // epsilon greedy exploration
+            float rand_num = torch::rand({}).item().toFloat();
+            if (rand_num > epsilon_greedy) {
+                // take agent action
+                pthread_mutex_lock(actor_mutex); // shared resource against updater
+                auto tensor_action = agent->act_single(obs_tensor).to(torch::kFloat32);
+                pthread_mutex_unlock(actor_mutex);
+                std::vector<float> vector_action(tensor_action.data_ptr<float>(),
+                                                 tensor_action.data_ptr<float>() + tensor_action.numel());
+                action = std::make_unique<std::vector<float>>(vector_action);
+            } else {
+                action = std::make_unique<std::vector<float>>(action_space->sample());
+            }
+        }
+
+        env->step(*action, false, &s);
+
+        // convert data type
+        auto action_tensor = torch::from_blob(action->data(), {(int64_t) action->size()});
+        auto next_obs_tensor = torch::from_blob(s.observation.data(), {(int64_t) s.observation.size()});
+        auto reward_tensor = torch::tensor({s.reward});
+        bool true_done = s.done & (!s.timeout);
+        auto done_tensor = torch::tensor({true_done}, torch::TensorOptions().dtype(torch::kFloat32));
+
+        // store data to the replay buffer
+        replay_buffer->add_single({
+                                          {"obs",      obs_tensor},
+                                          {"act",      action_tensor},
+                                          {"next_obs", next_obs_tensor},
+                                          {"rew",      reward_tensor},
+                                          {"done",     done_tensor}
+                                  });
+
+        // determine whether to break
+        pthread_mutex_lock(global_steps_mutex);
+        if (*global_steps >= max_global_steps) {
+            pthread_mutex_unlock(global_steps_mutex);
+            break;
+        } else {
+            *global_steps += 1;
+        }
+        pthread_mutex_unlock(global_steps_mutex);
+    }
+
+
+    return nullptr;
+}
+
+struct LearnerParam {
+    std::shared_ptr<PrioritizedReplayBuffer> replay_buffer;
+    std::shared_ptr<MlpDQN> agent;
+    std::shared_ptr<MlpDQN> actor;
+    pthread_mutex_t *global_steps_mutex;
+    std::vector<pthread_mutex_t *> actor_mutex;
+    int64_t *global_steps;
+    int64_t max_global_steps;
+    std::shared_ptr<LinearSchedule> beta_scheduler;
+    torch::Device device;
+};
+
+
+void *learner(void *params) {
+    auto *learner_param = (LearnerParam *) params;
+    auto buffer = learner_param->replay_buffer;
+    auto agent = learner_param->agent;
+    auto actor = learner_param->agent;
+    auto device = learner_param->device;
+    auto beta_scheduler = learner_param->beta_scheduler;
+    auto global_steps = learner_param->global_steps;
+    auto global_steps_mutex = learner_param->global_steps_mutex;
+    auto max_global_steps = learner_param->max_global_steps;
+    auto actor_mutex = learner_param->actor_mutex;
+    int64_t global_steps_temp;
+
+    while (true) {
+        pthread_mutex_lock(global_steps_mutex);
+        global_steps_temp = *global_steps;
+        pthread_mutex_unlock(global_steps_mutex);
+
+        if (global_steps_temp >= max_global_steps) {
+            break;
+        }
+
+        auto idx = buffer->generate_idx();
+        // get importance weights
+        auto weights = buffer->get_weights(*idx, (float) beta_scheduler->value(global_steps_temp));
+        // retrieve the actual data
+        auto data = *(*buffer)[*idx];
+        // training
+        auto logs = agent->train_step(data["obs"].to(device),
+                                      data["act"].to(device),
+                                      data["next_obs"].to(device),
+                                      data["rew"].to(device),
+                                      data["done"].to(device),
+                                      weights->to(device));
+        agent->update_target(true);
+        // update priority
+        buffer->update_priorities(*idx, (*logs)["abs_delta_q"]);
+
+        // propagate the weights to actor. The weights of actor are on CPU by default.
+        // try to acquire all the locks
+
+    }
+
+
+    return nullptr;
+}
+
+static void train_dqn_parallel(
+        const boost::shared_ptr<Gym::Client> &client,
+        const std::string &env_id,
+        int64_t epochs,
+        int64_t steps_per_epoch,
+        int64_t start_steps,
+        int64_t update_after,
+        int64_t update_every,
+        int64_t update_per_step,
+        int64_t policy_delay,
+        int64_t batch_size,
+        int64_t num_test_episodes,
+        int64_t seed,
+        // replay buffer
+        float alpha,
+        float initial_beta,
+        int64_t replay_size,
+        // agent parameters
+        int64_t mlp_hidden,
+        bool double_q,
+        float gamma,
+        float q_lr,
+        float tau,
+        float epsilon_greedy,
+        // torch
+        torch::Device device
+) {
+
+
+}
+
 
 #endif //HIPC21_DQN_H
