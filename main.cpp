@@ -47,7 +47,8 @@ parse(int argc, char *argv[]) {
                         ("q_lr", "learning rate", cxxopts::value<float>()->default_value("0.001"))
                         ("tau", "polyak averaging of target network", cxxopts::value<float>()->default_value("0.005"))
                         ("epsilon_greedy", "exploration rate", cxxopts::value<float>()->default_value("0.1"))
-                        ("device", "Pytorch device", cxxopts::value<std::string>()->default_value("cpu"));
+                        ("device", "Pytorch device", cxxopts::value<std::string>()->default_value("cpu"))
+                        ("num_actors", "Number of parallel actors", cxxopts::value<int64_t>()->default_value("1"));
 
         auto result = options.parse(argc, argv);
 
@@ -78,30 +79,37 @@ int main(int argc, char **argv) {
             device_type = torch::kCPU;
         }
         torch::Device device(device_type);
-        boost::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
 
-        train_dqn(client,
-                  result["env_id"].as<std::string>(),
-                  result["epochs"].as<int64_t>(),
-                  result["steps_per_epoch"].as<int64_t>(),
-                  result["start_steps"].as<int64_t>(),
-                  result["update_after"].as<int64_t>(),
-                  result["update_every"].as<int64_t>(),
-                  result["update_per_step"].as<int64_t>(),
-                  result["policy_delay"].as<int64_t>(),
-                  result["batch_size"].as<int64_t>(),
-                  result["num_test_episodes"].as<int64_t>(),
-                  result["seed"].as<int64_t>(),
-                  result["alpha"].as<float>(),
-                  result["initial_beta"].as<float>(),
-                  result["replay_size"].as<int64_t>(),
-                  result["mlp_hidden"].as<int64_t>(),
-                  result["double_q"].as<bool>(),
-                  result["gamma"].as<float>(),
-                  result["q_lr"].as<float>(),
-                  result["tau"].as<float>(),
-                  result["epsilon_greedy"].as<float>(),
-                  device);
+        int64_t num_actors = result["num_actors"].as<int64_t>();
+        std::vector<boost::shared_ptr<Gym::Client>> clients;
+        clients.reserve(num_actors);
+        for (int i = 0; i < num_actors; ++i) {
+            clients.push_back(Gym::client_create("127.0.0.1", 5000 + i));
+        }
+
+        train_dqn_parallel(clients,
+                           result["env_id"].as<std::string>(),
+                           result["epochs"].as<int64_t>(),
+                           result["steps_per_epoch"].as<int64_t>(),
+                           result["start_steps"].as<int64_t>(),
+                           result["update_after"].as<int64_t>(),
+                           result["update_every"].as<int64_t>(),
+                           result["update_per_step"].as<int64_t>(),
+                           result["policy_delay"].as<int64_t>(),
+                           result["batch_size"].as<int64_t>(),
+                           result["num_test_episodes"].as<int64_t>(),
+                           result["seed"].as<int64_t>(),
+                           result["alpha"].as<float>(),
+                           result["initial_beta"].as<float>(),
+                           result["replay_size"].as<int64_t>(),
+                           result["mlp_hidden"].as<int64_t>(),
+                           result["double_q"].as<bool>(),
+                           result["gamma"].as<float>(),
+                           result["q_lr"].as<float>(),
+                           result["tau"].as<float>(),
+                           result["epsilon_greedy"].as<float>(),
+                           device,
+                           num_actors);
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());
