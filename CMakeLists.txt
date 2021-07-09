@@ -10,7 +10,7 @@ set(LIBTORCH /home/chi/Downloads/libtorch-cxx11-abi-shared-with-deps-1.9.0+${DEV
 set(CMAKE_PREFIX_PATH "${LIBTORCH}")
 
 find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} -fopenmp")
 
 
 include_directories("./" "${LIBTORCH}/include" "envs/binding-cpp" "third_party/include")

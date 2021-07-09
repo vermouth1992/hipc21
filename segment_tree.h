@@ -6,6 +6,7 @@
 
 #include <torch/torch.h>
 #include <vector>
+#include "omp.h"
 
 class SegmentTree {
 public:
@@ -100,49 +101,114 @@ public:
         return m_size;
     }
 
+    virtual inline int64_t convert_to_node_idx(int64_t data_idx) const {
+        return data_idx + m_bound;
+    }
+
+    virtual inline int64_t convert_to_data_idx(int64_t node_idx) const {
+        return node_idx - m_bound;
+    }
+
+    virtual inline int64_t get_parent(int64_t node_idx) const {
+        return node_idx / 2;
+    }
+
+    virtual inline int64_t get_sibling(int64_t node_idx) const {
+        if (node_idx % 2 == 0) {
+            return node_idx + 1;
+        } else {
+            return node_idx - 1;
+        }
+    }
+
+    virtual inline bool is_leaf(int64_t node_idx) const {
+        return node_idx >= m_bound;
+    }
+
+    virtual inline bool is_left(int64_t node_idx) const {
+        return node_idx % 2 == 0;
+    }
+
+    virtual inline bool is_right(int64_t node_idx) const {
+        return node_idx % 2 == 1;
+    }
+
+    virtual inline int64_t get_left_child(int64_t node_idx) const {
+        return node_idx * 2;
+    }
+
+    virtual inline int64_t get_right_child(int64_t node_idx) const {
+        return node_idx * 2 + 1;
+    }
+
+    virtual inline int64_t get_root() const {
+        return 1;
+    }
+
+    virtual inline float get_value(int64_t node_idx) const {
+        return (*m_values)[node_idx];
+    }
+
+    virtual inline void set_value(int64_t node_idx, float value) {
+        (*m_values)[node_idx] = value;
+    }
+
     std::shared_ptr<torch::Tensor> operator[](const torch::Tensor &idx) const {
         auto idx_vector = convert_tensor_to_vector<int64_t>(idx);
         auto output = torch::zeros_like(idx, torch::TensorOptions().dtype(torch::kFloat32));
         for (int i = 0; i < idx_vector->size(); ++i) {
-            output.index_put_({i}, (*m_values)[i + m_bound]);
+            output.index_put_({i}, get_value(convert_to_node_idx(idx_vector->at(i))));
         }
         return std::make_shared<torch::Tensor>(output);
     }
 
     void set(const torch::Tensor &idx, const torch::Tensor &value) {
-        auto idx_vec = convert_tensor_to_vector<int64_t>(idx + m_bound);
+        auto idx_vec = convert_tensor_to_vector<int64_t>(idx);
         auto value_vec = convert_tensor_to_vector<float>(value);
         // put all the values
         for (int i = 0; i < idx_vec->size(); ++i) {
+            // get data pos
             int64_t pos = idx_vec->operator[](i);
-            (*m_values)[pos] = value_vec->operator[](i);
+            // get node pos
+            pos = convert_to_node_idx(pos);
+            // set the value of the leaf node
+            set_value(pos, value_vec->operator[](i));
             // update the parent
-            while (pos > 1) {
-                pos = pos / 2;
-                (*m_values)[pos] = (*m_values)[pos * 2] + (*m_values)[pos * 2 + 1];
+            int64_t parent, sibling;
+            while (pos != get_root()) {
+                parent = get_parent(pos);
+                sibling = get_sibling(pos);
+                set_value(parent, get_value(pos) + get_value(sibling));
+                pos = parent;
             }
         }
     }
 
     float reduce(int64_t start, int64_t end) const {
-        start = start + m_bound - 1;
-        end = end + m_bound;
+        assert(start >= 0 && end <= size() && end >= start);
+        if (start == 0) {
+            return reduce(end);
+        } else return reduce(end) - reduce(start);
+    }
+
+    float reduce(int64_t end) const {
+        assert(end > 0 && end <= size());
+        if (end == size()) {
+            return reduce();
+        }
+        end = convert_to_node_idx(end);
         float result = 0.;
-        while (end - start > 1) {
-            if (start % 2 == 0) {
-                result += (*m_values)[start + 1];
+        while (end != get_root()) {
+            if (is_right(end)) {
+                result += get_value(get_sibling(end));
             }
-            start = start / 2;
-            if (end % 2 == 1) {
-                result += (*m_values)[end - 1];
-            }
-            end = end / 2;
+            end = get_parent(end);
         }
         return result;
     }
 
     float reduce() const {
-        return (*m_values)[1];
+        return get_value(get_root());
     }
 
     std::shared_ptr<torch::Tensor> get_prefix_sum_idx(const torch::Tensor &value) const {
@@ -151,17 +217,17 @@ public:
                 torch::ones_like(value, torch::TensorOptions().dtype(torch::kInt64)));
 
         for (int i = 0; i < value_vec->size(); i++) {
-            int64_t idx = 1;
+            int64_t idx = get_root();
             float current_val = (*value_vec)[i];
-            while (idx < m_bound) {
-                idx = idx * 2;
-                auto lsons = (*m_values)[idx];
+            while (!is_leaf(idx)) {
+                idx = get_left_child(idx);
+                auto lsons = get_value(idx);
                 if (lsons < current_val) {
                     current_val -= lsons;
-                    idx += 1;
+                    idx = get_sibling(idx);
                 }
             }
-            (*index).index_put_({i}, idx - m_bound);
+            (*index).index_put_({i}, convert_to_data_idx(idx));
         }
 
         return index;

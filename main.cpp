@@ -83,36 +83,64 @@ int main(int argc, char **argv) {
         torch::Device device(device_type);
 
         int64_t num_actors = result["num_actors"].as<int64_t>();
-        std::vector<boost::shared_ptr<Gym::Client>> clients;
-        clients.reserve(num_actors);
-        for (int i = 0; i < num_actors; ++i) {
-            clients.push_back(Gym::client_create("127.0.0.1", 5000 + i));
+
+        if (num_actors < 0) {
+            boost::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
+            watcher.start();
+            train_dqn(client,
+                      result["env_id"].as<std::string>(),
+                      result["epochs"].as<int64_t>(),
+                      result["steps_per_epoch"].as<int64_t>(),
+                      result["start_steps"].as<int64_t>(),
+                      result["update_after"].as<int64_t>(),
+                      result["update_every"].as<int64_t>(),
+                      result["update_per_step"].as<int64_t>(),
+                      result["policy_delay"].as<int64_t>(),
+                      result["batch_size"].as<int64_t>(),
+                      result["num_test_episodes"].as<int64_t>(),
+                      result["seed"].as<int64_t>(),
+                      result["alpha"].as<float>(),
+                      result["initial_beta"].as<float>(),
+                      result["replay_size"].as<int64_t>(),
+                      result["mlp_hidden"].as<int64_t>(),
+                      result["double_q"].as<bool>(),
+                      result["gamma"].as<float>(),
+                      result["q_lr"].as<float>(),
+                      result["tau"].as<float>(),
+                      result["epsilon_greedy"].as<float>(),
+                      device);
+        } else {
+            std::vector<boost::shared_ptr<Gym::Client>> clients;
+            clients.reserve(num_actors);
+            for (int i = 0; i < num_actors; ++i) {
+                clients.push_back(Gym::client_create("127.0.0.1", 5000 + i));
+            }
+            watcher.start();
+            train_dqn_parallel(clients,
+                               result["env_id"].as<std::string>(),
+                               result["epochs"].as<int64_t>(),
+                               result["steps_per_epoch"].as<int64_t>(),
+                               result["start_steps"].as<int64_t>(),
+                               result["update_after"].as<int64_t>(),
+                               result["update_every"].as<int64_t>(),
+                               result["update_per_step"].as<int64_t>(),
+                               result["policy_delay"].as<int64_t>(),
+                               result["batch_size"].as<int64_t>(),
+                               result["num_test_episodes"].as<int64_t>(),
+                               result["seed"].as<int64_t>(),
+                               result["alpha"].as<float>(),
+                               result["initial_beta"].as<float>(),
+                               result["replay_size"].as<int64_t>(),
+                               result["mlp_hidden"].as<int64_t>(),
+                               result["double_q"].as<bool>(),
+                               result["gamma"].as<float>(),
+                               result["q_lr"].as<float>(),
+                               result["tau"].as<float>(),
+                               result["epsilon_greedy"].as<float>(),
+                               device,
+                               num_actors);
         }
 
-        watcher.start();
-        train_dqn_parallel(clients,
-                           result["env_id"].as<std::string>(),
-                           result["epochs"].as<int64_t>(),
-                           result["steps_per_epoch"].as<int64_t>(),
-                           result["start_steps"].as<int64_t>(),
-                           result["update_after"].as<int64_t>(),
-                           result["update_every"].as<int64_t>(),
-                           result["update_per_step"].as<int64_t>(),
-                           result["policy_delay"].as<int64_t>(),
-                           result["batch_size"].as<int64_t>(),
-                           result["num_test_episodes"].as<int64_t>(),
-                           result["seed"].as<int64_t>(),
-                           result["alpha"].as<float>(),
-                           result["initial_beta"].as<float>(),
-                           result["replay_size"].as<int64_t>(),
-                           result["mlp_hidden"].as<int64_t>(),
-                           result["double_q"].as<bool>(),
-                           result["gamma"].as<float>(),
-                           result["q_lr"].as<float>(),
-                           result["tau"].as<float>(),
-                           result["epsilon_greedy"].as<float>(),
-                           device,
-                           num_actors);
         watcher.stop();
         std::cout << "Total execution time: " << watcher.seconds() << " s" << std::endl;
 
