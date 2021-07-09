@@ -5,6 +5,7 @@
 #include "include/gym/gym.h"
 #include "dqn.h"
 #include "cxxopts.hpp"
+#include "functional.h"
 #include <iostream>
 
 cxxopts::ParseResult
@@ -67,6 +68,7 @@ parse(int argc, char *argv[]) {
 
 
 int main(int argc, char **argv) {
+    StopWatcher watcher;
     auto result = parse(argc, argv);
     try {
         std::string device_name = result["device"].as<std::string>();
@@ -87,6 +89,7 @@ int main(int argc, char **argv) {
             clients.push_back(Gym::client_create("127.0.0.1", 5000 + i));
         }
 
+        watcher.start();
         train_dqn_parallel(clients,
                            result["env_id"].as<std::string>(),
                            result["epochs"].as<int64_t>(),
@@ -110,6 +113,8 @@ int main(int argc, char **argv) {
                            result["epsilon_greedy"].as<float>(),
                            device,
                            num_actors);
+        watcher.stop();
+        std::cout << "Total execution time: " << watcher.seconds() << " s" << std::endl;
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());

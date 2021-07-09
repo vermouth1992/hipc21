@@ -10,6 +10,7 @@
 #include "functional.h"
 #include "include/gym/gym.h"
 #include "replay_buffer.h"
+#include "common.h"
 
 class DQN : public torch::nn::Module {
 public:
@@ -403,6 +404,7 @@ void *actor_fn(void *params) {
         // get global_steps
         pthread_mutex_lock(global_steps_mutex.get());
         global_steps_temp = *global_steps;
+        *global_steps += 1;
         pthread_mutex_unlock(global_steps_mutex.get());
 
         if (global_steps_temp % 1000 == 0) {
@@ -448,14 +450,10 @@ void *actor_fn(void *params) {
         pthread_mutex_unlock(buffer_mutex.get());
 
         // determine whether to break
-        pthread_mutex_lock(global_steps_mutex.get());
-        if (*global_steps >= max_global_steps) {
+        if (global_steps_temp >= max_global_steps) {
             pthread_mutex_unlock(global_steps_mutex.get());
             break;
-        } else {
-            *global_steps += 1;
         }
-        pthread_mutex_unlock(global_steps_mutex.get());
     }
 
     return nullptr;
@@ -525,8 +523,6 @@ void *learner_fn(void *params) {
         global_steps_temp = *global_steps;
         pthread_mutex_unlock(global_steps_mutex.get());
 
-        std::cout << "Actor Here" << global_steps_temp << std::endl;
-
         if (global_steps_temp >= max_global_steps) {
             break;
         }
@@ -550,7 +546,7 @@ void *learner_fn(void *params) {
             // update priority
             pthread_mutex_lock(buffer_mutex.get());
             // TODO: the idx may be override by the newly added items
-            buffer->update_priorities(*idx, (*logs)["abs_delta_q"]);
+            buffer->update_priorities(*idx, (*logs)["abs_delta_q"].to(cpu));
             pthread_mutex_unlock(buffer_mutex.get());
 
             // propagate the weights to actor. The weights of actor are on CPU by default.
@@ -562,8 +558,8 @@ void *learner_fn(void *params) {
             {
                 torch::NoGradGuard no_grad;
                 for (int i = 0; i < agent->parameters().size(); i++) {
-                    auto target_param = actor->parameters()[i];
-                    auto param = agent->parameters()[i];
+                    auto target_param = actor->parameters().at(i);
+                    auto param = agent->parameters().at(i);
                     target_param.data().copy_(param.data().to(cpu));
                 }
             }
@@ -689,15 +685,14 @@ static void train_dqn_parallel(
     }
 
     // start the learned thread
-//    ret = pthread_create(&learner_thread, nullptr, &learner_fn, (void *) learner_param.get());
-//    if (ret != 0) {
-//        std::cout << "Fail to create learner thread with error code " << ret << std::endl;
-//    }
+    ret = pthread_create(&learner_thread, nullptr, &learner_fn, (void *) learner_param.get());
+    if (ret != 0) {
+        std::cout << "Fail to create learner thread with error code " << ret << std::endl;
+    }
 
     // wait for all the thread to finish
+    pthread_join(learner_thread, nullptr);
     for (int i = 0; i < num_actors; ++i) {
-        std::cout << "Here" << std::endl;
-//        pthread_join(learner_thread, nullptr);
         pthread_join(actor_threads.at(i), nullptr);
     }
 }

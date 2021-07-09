@@ -112,6 +112,10 @@ public:
 
     }
 
+    explicit StopWatcher() : m_elapsed(0), m_name("default") {
+
+    }
+
     std::string name() const {
         return m_name;
     }
