@@ -20,7 +20,7 @@ TEST(SegmentTree, reduce) {
 }
 
 TEST(SegmentTreeCPP, reduce) {
-    int64_t tree_size = 8;
+    int64_t tree_size = 10;
     SegmentTreeCPP tree(tree_size);
     torch::Tensor index = torch::arange(tree_size);
     std::cout << index << std::endl;
@@ -39,7 +39,23 @@ TEST(SegmentTreeCPP, reduce) {
 
 
     ASSERT_NEAR(tree.reduce(), tree.reduce(0, tree_size), 1e-5);
-    torch::Tensor randnum = torch::rand({3}) * tree.reduce();
-    std::cout << *tree.get_prefix_sum_idx(randnum);
+    // leaf node
     std::cout << *(tree.operator[](torch::arange(tree_size)));
+    // random access frequency
+    torch::Tensor randnum = torch::rand({1000}) * tree.reduce();
+    auto sample_indexes = convert_tensor_to_vector<int64_t>(*tree.get_prefix_sum_idx(randnum));
+    std::vector<float> frequency(tree_size, 0.);
+    for (auto &i : *sample_indexes) {
+        frequency[i] += 1;
+    }
+    auto max_freq = *std::max_element(frequency.begin(), frequency.end());
+    for (float &i : frequency) {
+        i /= max_freq;
+    }
+    max_freq = *std::max_element(value_vec->begin(), value_vec->end());
+    for (float &i : *value_vec) {
+        i /= max_freq;
+    }
+    std::cout << frequency << std::endl << *value_vec << std::endl;
+
 }

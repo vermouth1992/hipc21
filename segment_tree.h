@@ -88,6 +88,8 @@ std::shared_ptr<std::vector<T>> convert_tensor_to_vector(const torch::Tensor &te
 
 class SegmentTreeCPP {
 public:
+    SegmentTreeCPP() = default;
+
     explicit SegmentTreeCPP(int64_t size) : m_size(size) {
         m_bound = 1;
         while (m_bound < size) {
@@ -122,7 +124,8 @@ public:
     }
 
     virtual inline bool is_leaf(int64_t node_idx) const {
-        return node_idx >= m_bound;
+        int64_t left_child = get_left_child(node_idx);
+        return left_child >= 2 * m_bound;
     }
 
     virtual inline bool is_left(int64_t node_idx) const {
@@ -233,10 +236,92 @@ public:
         return index;
     }
 
-private:
-    int64_t m_size;
-    int64_t m_bound;
+protected:
+    int64_t m_size{};
+    int64_t m_bound{};
     std::shared_ptr<std::vector<float>> m_values;
+};
+
+
+class SegmentTreeCPPOpt : public SegmentTreeCPP {
+public:
+    explicit SegmentTreeCPPOpt(int64_t size, int64_t partition_height) :
+            m_partition_height(partition_height),
+            m_block_branch_factor(1 << (partition_height - 1)) {
+        m_size = size;
+        m_bound = 1;
+        int64_t height = 1;
+        while (m_bound < size && (height - 1) % (partition_height - 1) == 0) {
+            m_bound = m_bound * 2;
+            height += 1;
+        }
+        m_block_height = (height - 1) / (partition_height - 1);
+        m_bottom_left_block_idx = ((1 << ((partition_height - 1) * (m_block_height - 1))) - 1)
+                                  / ((1 << (partition_height - 1)) - 1);
+        m_bottom_left_idx = get_last_row_first_element_inside_block(m_bottom_left_block_idx);
+        m_values = std::make_shared<std::vector<float>>(m_bound * 2, 0.0);
+    }
+
+    inline int64_t convert_to_node_idx(int64_t data_idx) const override {
+        // get the block offset towards the bottom left block
+        int64_t block_offset = data_idx / m_block_branch_factor;
+        int64_t block_idx = block_offset + m_bottom_left_block_idx;
+        // get the index offset
+        int64_t index_offset = data_idx % m_block_branch_factor;
+        // compute the index
+        int64_t block_bottom_left_node_idx = get_last_row_first_element_inside_block(block_idx);
+        return block_bottom_left_node_idx + index_offset;
+    }
+
+    inline int64_t convert_to_data_idx(int64_t node_idx) const override {
+        // node_idx must be leaf node
+        // compute block index
+        int64_t block_idx = get_block_index(node_idx);
+        int64_t block_offset = block_idx - m_bottom_left_block_idx;
+        int64_t block_bottom_left_node_idx = get_last_row_first_element_inside_block(block_idx);
+        int64_t index_offset = node_idx - block_bottom_left_node_idx;
+        // compute offset index
+        return block_offset * m_block_branch_factor + index_offset;
+    }
+
+    inline int64_t get_parent(int64_t node_idx) const override {
+        
+    }
+
+    inline int64_t get_left_child(int64_t node_idx) const override {
+
+    }
+
+    inline int64_t get_right_child(int64_t node_idx) const override {
+        return get_left_child(node_idx) + 1;
+    }
+
+private:
+    int64_t m_partition_height;
+    int64_t m_block_height;
+    int64_t m_block_branch_factor;
+    int64_t m_bottom_left_block_idx;
+    int64_t m_bottom_left_idx;
+
+    // given a node index, return the block index (0-based)
+    inline int64_t get_block_index(int64_t node_idx) const {
+        if (node_idx == 1) return -1;
+        return (node_idx - 2) / (2 * (m_block_branch_factor - 1));
+    }
+
+    // given a block index, return the parent block index
+    inline int64_t get_parent_block_index(int64_t block_idx) const {
+        return (block_idx - 1) / m_block_branch_factor;
+    }
+
+    inline int64_t get_second_row_first_element_inside_block(int64_t block_idx) const {
+        return block_idx * 2 * (m_block_branch_factor - 1) + 2;
+    }
+
+    inline int64_t get_last_row_first_element_inside_block(int64_t block_idx) const {
+        return block_idx * 2 * (m_block_branch_factor - 1) + m_block_branch_factor;
+    }
+
 };
 
 #define HIPC21_SEGMENT_TREE_H
