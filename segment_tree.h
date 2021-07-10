@@ -251,7 +251,7 @@ public:
         m_size = size;
         m_bound = 1;
         int64_t height = 1;
-        while (m_bound < size && (height - 1) % (partition_height - 1) == 0) {
+        while (m_bound < size || (height - 1) % (partition_height - 1) != 0) {
             m_bound = m_bound * 2;
             height += 1;
         }
@@ -285,11 +285,43 @@ public:
     }
 
     inline int64_t get_parent(int64_t node_idx) const override {
-        
+        if (node_idx == 2 || node_idx == 3) return 1;
+        // get block index
+        int64_t block_idx = get_block_index(node_idx);
+        int64_t block_second_row_first_node_idx = get_second_row_first_element_inside_block(block_idx);
+        if (node_idx > block_second_row_first_node_idx + 1) {
+            // not the second row
+            int64_t offset = block_second_row_first_node_idx - 2;
+            int64_t normalized_node_idx = node_idx - offset;
+            return normalized_node_idx / 2 + offset;
+        } else {
+            // the second row. the parent is the last row of the parent block
+            int64_t parent_block_idx = get_parent_block_idx(block_idx);
+            int64_t next_level_start_block_idx = m_block_branch_factor * parent_block_idx + 1;
+            int64_t block_bottom_left_node_idx = get_last_row_first_element_inside_block(parent_block_idx);
+            return block_bottom_left_node_idx + block_idx - next_level_start_block_idx;
+        }
+        return 0;
     }
 
     inline int64_t get_left_child(int64_t node_idx) const override {
-
+        // get block index
+        int64_t block_idx = get_block_index(node_idx);
+        if (block_idx == -1) return 2;
+        // whether on the last row
+        int64_t block_bottom_left_node_idx = get_last_row_first_element_inside_block(block_idx);
+        if (node_idx < block_bottom_left_node_idx) {
+            // not the last row.
+            int64_t block_second_row_first_node_idx = get_second_row_first_element_inside_block(block_idx);
+            int64_t offset = block_second_row_first_node_idx - 2;
+            int64_t normalized_node_idx = node_idx - offset;
+            return normalized_node_idx * 2 + offset;
+        } else {
+            // last row. the child is at next level block
+            int64_t next_level_start_block_idx = m_block_branch_factor * block_idx + 1;
+            int64_t next_level_block_idx = next_level_start_block_idx + node_idx - block_bottom_left_node_idx;
+            return get_second_row_first_element_inside_block(next_level_block_idx);
+        }
     }
 
     inline int64_t get_right_child(int64_t node_idx) const override {
@@ -322,6 +354,10 @@ private:
         return block_idx * 2 * (m_block_branch_factor - 1) + m_block_branch_factor;
     }
 
+
+    inline int64_t get_parent_block_idx(int64_t block_idx) const {
+        return (block_idx - 1) / m_block_branch_factor;
+    }
 };
 
 #define HIPC21_SEGMENT_TREE_H

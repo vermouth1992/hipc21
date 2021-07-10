@@ -19,6 +19,46 @@ TEST(SegmentTree, reduce) {
     std::cout << *(tree.operator[](torch::arange(tree_size)));
 }
 
+TEST(SegmentTreeCPPOpt, all) {
+    int64_t tree_size = 10;
+    SegmentTreeCPPOpt tree(tree_size, 4);
+    torch::Tensor index = torch::arange(tree_size);
+    std::cout << index << std::endl;
+    torch::Tensor value = torch::rand({tree_size}) * 10;
+    tree.set(index, value);
+    auto value_vec = convert_tensor_to_vector<float>(value);
+    std::cout << *value_vec << std::endl << value;
+    std::cout << *(tree.operator[](torch::arange(tree_size)));
+
+    for (int i = 1; i <= tree_size; ++i) {
+        float true_sum = 0;
+        for (int j = 0; j < i; ++j) {
+            true_sum += value_vec->at(j);
+        }
+        std::cout << true_sum << " " << tree.reduce(i) << std::endl;
+        ASSERT_NEAR(true_sum, tree.reduce(i), 1e-5);
+    }
+
+
+    ASSERT_NEAR(tree.reduce(), tree.reduce(0, tree_size), 1e-5);
+
+    torch::Tensor randnum = torch::rand({1000}) * tree.reduce();
+    auto sample_indexes = convert_tensor_to_vector<int64_t>(*tree.get_prefix_sum_idx(randnum));
+    std::vector<float> frequency(tree_size, 0.);
+    for (auto &i : *sample_indexes) {
+        frequency[i] += 1;
+    }
+    auto max_freq = *std::max_element(frequency.begin(), frequency.end());
+    for (float &i : frequency) {
+        i /= max_freq;
+    }
+    max_freq = *std::max_element(value_vec->begin(), value_vec->end());
+    for (float &i : *value_vec) {
+        i /= max_freq;
+    }
+    std::cout << frequency << std::endl << *value_vec << std::endl;
+}
+
 TEST(SegmentTreeCPP, reduce) {
     int64_t tree_size = 10;
     SegmentTreeCPP tree(tree_size);
