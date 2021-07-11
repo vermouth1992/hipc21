@@ -9,7 +9,7 @@
 TEST(SegmentTree, speed) {
     StopWatcher origin;
     StopWatcher optimized;
-    int64_t tree_size = 1000;
+    int64_t tree_size = 1000000;
     int64_t batch_size = 256;
     SegmentTreeCPPOpt tree_opt(tree_size, 3);
     SegmentTreeCPP tree(tree_size);

@@ -90,13 +90,16 @@ class SegmentTreeCPP {
 public:
     SegmentTreeCPP() = default;
 
+    ~SegmentTreeCPP() {
+        delete[]m_values;
+    }
+
     explicit SegmentTreeCPP(int64_t size) : m_size(size) {
         m_bound = 1;
         while (m_bound < size) {
             m_bound = m_bound * 2;
         }
-
-        m_values = std::make_shared<std::vector<float>>(m_bound * 2, 0.0);
+        initialize();
     }
 
     int64_t size() const {
@@ -149,12 +152,14 @@ public:
     }
 
     virtual inline float get_value(int64_t node_idx) const {
-        auto value = m_values->at(node_idx);
+//        auto value = m_values->at(node_idx);
+        auto value = m_values[node_idx];
         return value;
     }
 
     virtual inline void set_value(int64_t node_idx, float value) {
-        m_values->at(node_idx) = value;
+        m_values[node_idx] = value;
+//        m_values->at(node_idx) = value;
     }
 
     std::shared_ptr<torch::Tensor> operator[](const torch::Tensor &idx) const {
@@ -242,7 +247,17 @@ public:
 protected:
     int64_t m_size{};
     int64_t m_bound{};
-    std::shared_ptr<std::vector<float>> m_values;
+//    std::shared_ptr<std::vector<float>> m_values;
+    float *m_values{};
+
+    void initialize() {
+        //        m_values = std::make_shared<std::vector<float>>(m_bound * 2, 0.0);
+        std::cout << m_bound << std::endl;
+        m_values = new float[m_bound * 2];
+        for (int i = 0; i < m_bound * 2; ++i) {
+            m_values[i] = 0.;
+        }
+    }
 };
 
 
@@ -262,7 +277,7 @@ public:
         m_bottom_left_block_idx = ((1 << ((partition_height - 1) * (m_block_height - 1))) - 1)
                                   / ((1 << (partition_height - 1)) - 1);
         m_bottom_left_idx = get_last_row_first_element_inside_block(m_bottom_left_block_idx);
-        m_values = std::make_shared<std::vector<float>>(m_bound * 2, 0.0);
+        initialize();
     }
 
     inline int64_t convert_to_node_idx(int64_t data_idx) const override {
