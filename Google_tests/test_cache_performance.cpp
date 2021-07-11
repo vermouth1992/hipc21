@@ -8,7 +8,7 @@
 #define RAW
 
 TEST(Array, cache) {
-    int size = 1000000;
+    int size = 100000;
 
 #ifdef RAW
     auto *a = new float[size];
@@ -46,25 +46,27 @@ TEST(Array, cache) {
 
     float result1 = 0.;
     int64_t counter1 = 0;
+    int64_t start_idx1 = size - 1;
+    int interval = 2;
     seq.start();
     for (int i = 0; i < iterations; ++i) {
         counter1 = 0;
-        for (int j = 0; j < counter; ++j) {
+        for (int j = 0; j < counter * interval; j = j + interval) {
 #ifdef RAW
             result1 += a[j];
 #else
             result1 += a->at(j);
 #endif
-            start_idx -= 10;
+            start_idx1 -= 10;
             counter1 += 1;
         }
-        start_idx = size - 1;
+        start_idx1 = size - 1;
     }
     seq.stop();
 
     std::cout << counter << " " << counter1 << std::endl;
     std::cout << half.seconds() << " " << seq.seconds() << std::endl;
-    std::cout << result << " " << result1 << " " << start_idx << std::endl;
+    std::cout << result << " " << result1 << " " << start_idx << start_idx1 << std::endl;
 #ifdef RAW
     delete[]a;
 #endif

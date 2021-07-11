@@ -10,20 +10,11 @@ TEST(SegmentTree, speed) {
     StopWatcher origin;
     StopWatcher optimized;
     int64_t tree_size = 1000000;
-    int64_t batch_size = 256;
+    int64_t batch_size = 100;
     SegmentTreeCPPOpt tree_opt(tree_size, 3);
     SegmentTreeCPP tree(tree_size);
     int64_t iterations = 10000;
     // random set
-
-    torch::manual_seed(1);
-    origin.start();
-    for (int i = 0; i < iterations; ++i) {
-        auto idx = torch::randint(tree_size, {batch_size}, torch::TensorOptions().dtype(torch::kInt64));
-        auto value = torch::rand({batch_size}) * 10;
-        tree.set(idx, value);
-    }
-    origin.stop();
 
     torch::manual_seed(1);
     optimized.start();
@@ -33,6 +24,15 @@ TEST(SegmentTree, speed) {
         tree_opt.set(idx, value);
     }
     optimized.stop();
+
+    torch::manual_seed(1);
+    origin.start();
+    for (int i = 0; i < iterations; ++i) {
+        auto idx = torch::randint(tree_size, {batch_size}, torch::TensorOptions().dtype(torch::kInt64));
+        auto value = torch::rand({batch_size}) * 10;
+        tree.set(idx, value);
+    }
+    origin.stop();
 
 
     std::cout << origin.seconds() << " " << optimized.seconds() << std::endl;
