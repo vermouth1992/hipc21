@@ -4,6 +4,41 @@
 
 #include "gtest/gtest.h"
 #include "segment_tree.h"
+#include "functional.h"
+
+TEST(SegmentTree, speed) {
+    StopWatcher origin;
+    StopWatcher optimized;
+    int64_t tree_size = 1000;
+    int64_t batch_size = 256;
+    SegmentTreeCPPOpt tree_opt(tree_size, 3);
+    SegmentTreeCPP tree(tree_size);
+    int64_t iterations = 10000;
+    // random set
+
+    torch::manual_seed(1);
+    origin.start();
+    for (int i = 0; i < iterations; ++i) {
+        auto idx = torch::randint(tree_size, {batch_size}, torch::TensorOptions().dtype(torch::kInt64));
+        auto value = torch::rand({batch_size}) * 10;
+        tree.set(idx, value);
+    }
+    origin.stop();
+
+    torch::manual_seed(1);
+    optimized.start();
+    for (int i = 0; i < iterations; ++i) {
+        auto idx = torch::randint(tree_size, {batch_size}, torch::TensorOptions().dtype(torch::kInt64));
+        auto value = torch::rand({batch_size}) * 10;
+        tree_opt.set(idx, value);
+    }
+    optimized.stop();
+
+
+    std::cout << origin.seconds() << " " << optimized.seconds() << std::endl;
+
+
+}
 
 TEST(SegmentTree, reduce) {
     int64_t tree_size = 20;
@@ -74,7 +109,7 @@ TEST(SegmentTreeCPP, reduce) {
             true_sum += value_vec->at(j);
         }
         std::cout << true_sum << " " << tree.reduce(i) << std::endl;
-        ASSERT_NEAR(true_sum, tree.reduce(i), 1e-5);
+        ASSERT_NEAR(true_sum, tree.reduce(i), 1e-4);
     }
 
 

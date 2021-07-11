@@ -125,11 +125,11 @@ public:
     }
 
     void start() {
-        m_start_time = std::chrono::steady_clock::now();
+        m_start_time = std::chrono::high_resolution_clock::now();
     }
 
     void stop() {
-        auto end_time = std::chrono::steady_clock::now();
+        auto end_time = std::chrono::high_resolution_clock::now();
         m_elapsed += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - m_start_time).count();
     }
 
@@ -153,7 +153,7 @@ public:
 private:
     std::string m_name;
     int64_t m_elapsed;
-    std::chrono::steady_clock::time_point m_start_time;
+    std::chrono::high_resolution_clock::time_point m_start_time;
 };
 
 #endif //HIPC21_FUNCTIONAL_H

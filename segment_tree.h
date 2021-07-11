@@ -6,7 +6,7 @@
 
 #include <torch/torch.h>
 #include <vector>
-#include "omp.h"
+#include "functional.h"
 
 class SegmentTree {
 public:
@@ -149,11 +149,12 @@ public:
     }
 
     virtual inline float get_value(int64_t node_idx) const {
-        return (*m_values)[node_idx];
+        auto value = m_values->at(node_idx);
+        return value;
     }
 
     virtual inline void set_value(int64_t node_idx, float value) {
-        (*m_values)[node_idx] = value;
+        m_values->at(node_idx) = value;
     }
 
     std::shared_ptr<torch::Tensor> operator[](const torch::Tensor &idx) const {
@@ -169,20 +170,22 @@ public:
         auto idx_vec = convert_tensor_to_vector<int64_t>(idx);
         auto value_vec = convert_tensor_to_vector<float>(value);
         // put all the values
-        for (int i = 0; i < idx_vec->size(); ++i) {
+        for (int i = 0; i < (int) idx_vec->size(); ++i) {
             // get data pos
             int64_t pos = idx_vec->operator[](i);
             // get node pos
             pos = convert_to_node_idx(pos);
             // set the value of the leaf node
-            set_value(pos, value_vec->operator[](i));
+            auto original_value = get_value(pos);
+            auto new_value = value_vec->operator[](i);
+            auto delta = new_value - original_value;
             // update the parent
-            int64_t parent, sibling;
-            while (pos != get_root()) {
-                parent = get_parent(pos);
-                sibling = get_sibling(pos);
-                set_value(parent, get_value(pos) + get_value(sibling));
-                pos = parent;
+            while (true) {
+                set_value(pos, get_value(pos) + delta);
+                if (pos == get_root()) {
+                    break;
+                }
+                pos = get_parent(pos);
             }
         }
     }
@@ -219,7 +222,7 @@ public:
         auto index = std::make_unique<torch::Tensor>(
                 torch::ones_like(value, torch::TensorOptions().dtype(torch::kInt64)));
 
-        for (int i = 0; i < value_vec->size(); i++) {
+        for (int i = 0; i < (int) value_vec->size(); i++) {
             int64_t idx = get_root();
             float current_val = (*value_vec)[i];
             while (!is_leaf(idx)) {
@@ -264,7 +267,7 @@ public:
 
     inline int64_t convert_to_node_idx(int64_t data_idx) const override {
         // get the block offset towards the bottom left block
-        int64_t block_offset = data_idx / m_block_branch_factor;
+        int64_t block_offset = data_idx >> (m_partition_height - 1);
         int64_t block_idx = block_offset + m_bottom_left_block_idx;
         // get the index offset
         int64_t index_offset = data_idx % m_block_branch_factor;
@@ -301,7 +304,6 @@ public:
             int64_t block_bottom_left_node_idx = get_last_row_first_element_inside_block(parent_block_idx);
             return block_bottom_left_node_idx + block_idx - next_level_start_block_idx;
         }
-        return 0;
     }
 
     inline int64_t get_left_child(int64_t node_idx) const override {
@@ -338,12 +340,12 @@ private:
     // given a node index, return the block index (0-based)
     inline int64_t get_block_index(int64_t node_idx) const {
         if (node_idx == 1) return -1;
-        return (node_idx - 2) / (2 * (m_block_branch_factor - 1));
+        return ((node_idx - 2) / (m_block_branch_factor - 1)) >> 1;
     }
 
     // given a block index, return the parent block index
     inline int64_t get_parent_block_index(int64_t block_idx) const {
-        return (block_idx - 1) / m_block_branch_factor;
+        return (block_idx - 1) >> (m_partition_height - 1);
     }
 
     inline int64_t get_second_row_first_element_inside_block(int64_t block_idx) const {
@@ -351,12 +353,12 @@ private:
     }
 
     inline int64_t get_last_row_first_element_inside_block(int64_t block_idx) const {
-        return block_idx * 2 * (m_block_branch_factor - 1) + m_block_branch_factor;
+        return ((block_idx * (m_block_branch_factor - 1)) << 1) + m_block_branch_factor;
     }
 
 
     inline int64_t get_parent_block_idx(int64_t block_idx) const {
-        return (block_idx - 1) / m_block_branch_factor;
+        return (block_idx - 1) >> (m_partition_height - 1);
     }
 };
 
