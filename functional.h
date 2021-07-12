@@ -22,7 +22,7 @@ static std::pair<float, float> compute_mean_std(const std::vector<T> &v) {
 static void hard_update(const torch::nn::Module &target, const torch::nn::Module &source) {
     {
         torch::NoGradGuard no_grad;
-        for (int i = 0; i < target.parameters().size(); i++) {
+        for (uint i = 0; i < target.parameters().size(); i++) {
             auto target_param = target.parameters()[i];
             auto param = source.parameters()[i];
             target_param.data().copy_(param.data());
@@ -33,7 +33,7 @@ static void hard_update(const torch::nn::Module &target, const torch::nn::Module
 static void soft_update(const torch::nn::Module &target, const torch::nn::Module &source, float tau) {
     {
         torch::NoGradGuard no_grad;
-        for (int i = 0; i < target.parameters().size(); i++) {
+        for (uint i = 0; i < target.parameters().size(); i++) {
             auto target_param = target.parameters()[i];
             auto param = source.parameters()[i];
             target_param.data().copy_(target_param.data() * (1.0 - tau) + param.data() * tau);
@@ -151,8 +151,8 @@ public:
 
 
 private:
-    std::string m_name;
     int64_t m_elapsed;
+    std::string m_name;
     std::chrono::high_resolution_clock::time_point m_start_time;
 };
 

@@ -96,7 +96,7 @@ TEST(SegmentTreeCPPOpt, all) {
 
 TEST(SegmentTreeCPP, reduce) {
     int64_t tree_size = 10;
-    SegmentTreeCPP tree(tree_size);
+    SegmentTreeNary tree(tree_size, 2);
     torch::Tensor index = torch::arange(tree_size);
     std::cout << index << std::endl;
     torch::Tensor value = torch::rand({tree_size}) * 10;
@@ -117,7 +117,7 @@ TEST(SegmentTreeCPP, reduce) {
     // leaf node
     std::cout << *(tree.operator[](torch::arange(tree_size)));
     // random access frequency
-    torch::Tensor randnum = torch::rand({1000}) * tree.reduce();
+    torch::Tensor randnum = torch::rand({100000}) * tree.reduce();
     auto sample_indexes = convert_tensor_to_vector<int64_t>(*tree.get_prefix_sum_idx(randnum));
     std::vector<float> frequency(tree_size, 0.);
     for (auto &i : *sample_indexes) {
