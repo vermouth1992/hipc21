@@ -13,7 +13,7 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} -fopenmp -O3 -Wall -Wextra")
 
 
-include_directories("./" "${LIBTORCH}/include" "envs/binding-cpp" "third_party/include")
+include_directories("./" "${LIBTORCH}/include" "envs/binding-cpp" "third_party")
 
 add_subdirectory(Google_tests)
 

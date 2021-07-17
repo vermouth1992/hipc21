@@ -8,9 +8,9 @@
 #include <vector>
 #include "functional.h"
 
-class SegmentTree {
+class SegmentTreeTorch {
 public:
-    explicit SegmentTree(int64_t size) : m_size(size) {
+    explicit SegmentTreeTorch(int64_t size) : m_size(size) {
         m_bound = 1;
         while (m_bound < size) {
             m_bound = m_bound * 2;
@@ -248,7 +248,7 @@ protected:
     float *m_values{};
 
     void initialize() {
-        std::cout << m_bound << std::endl;
+//        std::cout << m_bound << std::endl;
         m_values = new float[m_bound * 2];
         for (int i = 0; i < m_bound * 2; ++i) {
             m_values[i] = 0.;
@@ -276,12 +276,18 @@ public:
         return m_size;
     }
 
+    virtual inline int64_t get_node_idx_after_padding(int64_t node_idx) const {
+        return node_idx + m_padding;
+    }
+
     virtual inline float get_value(int64_t node_idx) const {
+        node_idx = get_node_idx_after_padding(node_idx);
         auto value = m_values[node_idx];
         return value;
     }
 
     virtual inline void set_value(int64_t node_idx, float value) {
+        node_idx = get_node_idx_after_padding(node_idx);
         m_values[node_idx] = value;
     }
 
@@ -294,7 +300,7 @@ public:
     }
 
     virtual inline int64_t get_parent(int64_t node_idx) const {
-        return (node_idx - 1) / m_n;
+        return (node_idx - 1) >> log2_m_n;
     }
 
     virtual inline int64_t get_root() const {
@@ -375,7 +381,8 @@ public:
 
     // get the most left child in a N-ary heap in zero-based array
     virtual inline int64_t get_left_child(int64_t node_idx) const {
-        return node_idx * m_n + 1;
+        // using shift operator is crucial
+        return (node_idx << log2_m_n) + 1;
     }
 
     std::shared_ptr<torch::Tensor> get_prefix_sum_idx(const torch::Tensor &value) const {
@@ -408,20 +415,25 @@ public:
 
 private:
     int64_t m_n{};
+    int64_t log2_m_n{};
     int64_t m_size{};
     // the size of the last level
     int64_t last_level_size{};
     int64_t m_bound{};
+    int64_t m_padding{};
     float *m_values{};
 
     void initialize() {
         // zero-based indexing
         int64_t total_size = (last_level_size * m_n - 1) / (m_n - 1);
-        m_values = new float[total_size];
+        // making the data at each level cache aligned
+        m_padding = m_n - 1;
+        log2_m_n = (int64_t) std::log2(m_n);
+        m_values = new float[total_size + m_padding];
         for (int i = 0; i < total_size; ++i) {
             m_values[i] = 0.;
         }
-        std::cout << m_n << " " << m_size << " " << last_level_size << " " << m_bound << std::endl;
+//        std::cout << m_n << " " << m_size << " " << last_level_size << " " << m_bound << std::endl;
     }
 };
 
