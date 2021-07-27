@@ -3,13 +3,13 @@
 //
 
 #include "gtest/gtest.h"
-#include <stdio.h>
+#include <cstdio>
 #include <sys/sysinfo.h>
-
+#include <common.h>
 
 TEST(cpu, core) {
     printf("This system has %d processors configured and "
            "%d processors available.\n",
            get_nprocs_conf(), get_nprocs());
-
+    M_Assert(false, "It is supposed to be false");
 }

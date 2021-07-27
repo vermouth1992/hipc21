@@ -9,7 +9,7 @@
 #include <utility>
 #include "functional.h"
 #include "include/gym/gym.h"
-#include "replay_buffer.h"
+#include "replay_buffer/replay_buffer.h"
 #include "common.h"
 
 class DQN : public torch::nn::Module {

@@ -3,9 +3,10 @@
 //
 
 #include "include/gym/gym.h"
-#include "dqn.h"
+#include "dqn/dqn.h"
 #include "cxxopts.hpp"
 #include "functional.h"
+#include "logger.h"
 #include <iostream>
 
 cxxopts::ParseResult

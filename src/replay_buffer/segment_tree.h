@@ -3,6 +3,7 @@
 //
 
 #ifndef HIPC21_SEGMENT_TREE_H
+#define HIPC21_SEGMENT_TREE_H
 
 #include <torch/torch.h>
 #include <vector>
@@ -551,7 +552,5 @@ private:
         return (block_idx - 1) >> (m_partition_height - 1);
     }
 };
-
-#define HIPC21_SEGMENT_TREE_H
 
 #endif //HIPC21_SEGMENT_TREE_H

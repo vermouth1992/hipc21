@@ -3,7 +3,7 @@
 //
 
 #include "gtest/gtest.h"
-#include "segment_tree.h"
+#include "replay_buffer/segment_tree.h"
 #include "functional.h"
 
 TEST(SegmentTree, speed) {
@@ -54,7 +54,7 @@ TEST(SegmentTree, speed) {
 TEST(SegmentTree, reduce) {
     int64_t tree_size = 20;
     int64_t index_size = 3;
-    SegmentTree tree(tree_size);
+    SegmentTreeTorch tree(tree_size);
     torch::Tensor index = torch::randint(tree_size, {index_size}, torch::TensorOptions().dtype(torch::kInt64));
     std::cout << index << std::endl;
     torch::Tensor value = torch::rand({index_size}) * 10;
