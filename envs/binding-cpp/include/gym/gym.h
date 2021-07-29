@@ -3,6 +3,7 @@
 // Caffe uses boost::shared_ptr (as opposed to std::shared_ptr), so do we.
 #include <boost/shared_ptr.hpp>
 #include <vector>
+#include <string>
 
 namespace Gym {
 

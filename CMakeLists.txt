@@ -1,19 +1,17 @@
 cmake_minimum_required(VERSION 3.15)
 project(hipc21)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
-set(DEVICE cu111)
-
-set(LIBTORCH /home/chi/Downloads/libtorch-cxx11-abi-shared-with-deps-1.9.0+${DEVICE}/libtorch)
+set(LIBTORCH $ENV{HOME}/libtorch)
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH}")
 
 find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} -fopenmp -O3 -Wall -Wextra")
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
 
 include_directories("src" "${LIBTORCH}/include" "envs/binding-cpp" "third_party")
+link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
 add_subdirectory(Google_tests)
 
@@ -27,9 +25,7 @@ set(SOURCE_FILES
 
 add_executable(hipc21 ${SOURCE_FILES})
 
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" jsoncpp curl m)
-set_property(TARGET hipc21 PROPERTY CXX_STANDARD 17)
-
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" jsoncpp curl)
 
 add_library(lib STATIC src/replay_buffer/SumTree.cpp src/replay_buffer/SumTree.h)
 
