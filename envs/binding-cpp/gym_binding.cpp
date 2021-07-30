@@ -3,8 +3,8 @@
 
 #include <curl/curl.h>
 
-#include <jsoncpp/json/value.h>
-#include <jsoncpp/json/reader.h>
+#include <json/value.h>
+#include <json/reader.h>
 
 #include <cstdio>
 #include <random>
@@ -47,8 +47,8 @@ namespace Gym {
     }
 
     static
-    boost::shared_ptr<Space> space_from_json(const Json::Value &j) {
-        boost::shared_ptr<Space> r(new Space);
+    boost::shared_ptr <Space> space_from_json(const Json::Value &j) {
+        boost::shared_ptr <Space> r(new Space);
         Json::Value v = j["info"];
         std::string type = require(v, "name");
         if (type == "Discrete") {
@@ -103,8 +103,8 @@ namespace Gym {
         std::string addr;
         int port;
 
-        boost::shared_ptr<CURL> h;
-        boost::shared_ptr<curl_slist> headers;
+        boost::shared_ptr <CURL> h;
+        boost::shared_ptr <curl_slist> headers;
         std::vector<char> curl_error_buf;
 
         ClientReal() {
@@ -118,8 +118,11 @@ namespace Gym {
             curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, &curl_save_to_string);
             curl_error_buf.assign(CURL_ERROR_SIZE, 0);
             curl_easy_setopt(c, CURLOPT_ERRORBUFFER, curl_error_buf.data());
-            h.reset(c, std::ptr_fun(curl_easy_cleanup));
-            headers.reset(curl_slist_append(0, "Content-Type: application/json"), std::ptr_fun(curl_slist_free_all));
+//            h.reset(c, std::ptr_fun(curl_easy_cleanup));
+            h.reset(c, [](CURL *curl) { curl_easy_cleanup(curl); });
+//            headers.reset(curl_slist_append(0, "Content-Type: application/json"), std::ptr_fun(curl_slist_free_all));
+            headers.reset(curl_slist_append(0, "Content-Type: application/json"),
+                          [](struct curl_slist *l) { curl_slist_free_all(l); });
         }
 
         Json::Value GET(const std::string &route) {
@@ -188,11 +191,11 @@ namespace Gym {
             }
         }
 
-        boost::shared_ptr<Environment> make(const std::string &env_id) override;
+        boost::shared_ptr <Environment> make(const std::string &env_id) override;
     };
 
-    boost::shared_ptr<Client> client_create(const std::string &addr, int port) {
-        boost::shared_ptr<ClientReal> client(new ClientReal);
+    boost::shared_ptr <Client> client_create(const std::string &addr, int port) {
+        boost::shared_ptr <ClientReal> client(new ClientReal);
         client->addr = addr;
         client->port = port;
         return client;
@@ -204,17 +207,17 @@ namespace Gym {
     class EnvironmentReal : public Environment {
     public:
         std::string instance_id;
-        boost::shared_ptr<ClientReal> client;
-        boost::shared_ptr<Space> space_act;
-        boost::shared_ptr<Space> space_obs;
+        boost::shared_ptr <ClientReal> client;
+        boost::shared_ptr <Space> space_act;
+        boost::shared_ptr <Space> space_obs;
 
-        boost::shared_ptr<Space> action_space() override {
+        boost::shared_ptr <Space> action_space() override {
             if (!space_act)
                 space_act = space_from_json(client->GET("/v1/envs/" + instance_id + "/action_space"));
             return space_act;
         }
 
-        boost::shared_ptr<Space> observation_space() override {
+        boost::shared_ptr <Space> observation_space() override {
             if (!space_obs)
                 space_obs = space_from_json(client->GET("/v1/envs/" + instance_id + "/observation_space"));
             return space_obs;
@@ -237,7 +240,7 @@ namespace Gym {
 
         void step(const std::vector<float> &action, bool render, State *save_state_here) override {
             Json::Value act_json;
-            boost::shared_ptr<Space> aspace = action_space();
+            boost::shared_ptr <Space> aspace = action_space();
             if (aspace->type == Space::DISCRETE) {
                 act_json["action"] = (int) action[0];
             } else if (aspace->type == Space::BOX) {
@@ -269,13 +272,13 @@ namespace Gym {
         }
     };
 
-    boost::shared_ptr<Environment> ClientReal::make(const std::string &env_id) {
+    boost::shared_ptr <Environment> ClientReal::make(const std::string &env_id) {
         Json::Value req;
         req["env_id"] = env_id;
         Json::Value ans = POST("/v1/envs/", req.toStyledString());
         std::string instance_id = require(ans, "instance_id");
         if (verbose) printf(" * created %s instance_id=%s\n", env_id.c_str(), instance_id.c_str());
-        boost::shared_ptr<EnvironmentReal> env(new EnvironmentReal);
+        boost::shared_ptr <EnvironmentReal> env(new EnvironmentReal);
         env->client = shared_from_this();
         env->instance_id = instance_id;
         return env;
