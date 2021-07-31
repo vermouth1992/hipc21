@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 import flask
 from flask import Flask, request, jsonify
 
-assert flask.__version__ == '0.11.1'
+assert flask.__version__ == '2.0.1'
 
 import uuid
 import gym
