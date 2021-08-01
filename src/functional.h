@@ -8,6 +8,8 @@
 #include <chrono>
 #include <utility>
 #include <torch/torch.h>
+#include <string>
+#include <vector>
 
 template<class T>
 static std::pair<float, float> compute_mean_std(const std::vector<T> &v) {
@@ -72,7 +74,7 @@ public:
 
     }
 
-    double value(int64_t t) override {
+    double value(__attribute__((unused)) int64_t t) override {
         return m_value;
     }
 
