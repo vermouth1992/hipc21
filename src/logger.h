@@ -12,11 +12,14 @@
 #include <utility>
 #include <vector>
 #include <numeric>
+#include <optional>
+#include "nlohmann/json.hpp"
 #include "common.h"
 #include "fmt/core.h"
 #include "fmt/compile.h"
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 static std::map<std::string, int> color2num = {{"gray",    30},
                                                {"red",     31},
@@ -43,6 +46,28 @@ static std::string colorize(const std::string &string, const std::string &color,
     attr.push_back(std::to_string(num));
     if (bold) attr.emplace_back("1");
     return fmt::format("\x1b[{}m{}\x1b[0m", string_join(attr, ";"), string);
+}
+
+
+template<class T>
+static std::map<std::string, float> statistics_scalar(const std::vector<T> &v,
+                                                      bool average_only = false,
+                                                      bool with_min_and_max = false) {
+    float sum = std::accumulate(v.begin(), v.end(), 0.0);
+    float mean = sum / v.size();
+    std::map<std::string, float> result{{"Average", mean}};
+
+    if (!average_only) {
+        float sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+        float stddev = std::sqrt(sq_sum / v.size() - mean * mean);
+        result["Std"] = stddev;
+    }
+
+    if (with_min_and_max) {
+        result["Max"] = *std::max_element(v.begin(), v.end());
+        result["Min"] = *std::min_element(v.begin(), v.end());
+    }
+    return result;
 }
 
 static std::string setup_logger_kwargs(
@@ -101,8 +126,24 @@ public:
     }
 
     static void log(const std::string &msg, const std::string &color = "green") {
-        std::cout << colorize(msg, color, true) << std::endl;
+        fmt::print("{}", colorize(msg, color, true) + "\n");
     }
+
+    void save_config(json &root) {
+        if (!m_exp_name.empty()) {
+            root["exp_name"] = m_exp_name;
+        }
+        std::string output = root.dump(4);
+        fmt::print("{}", colorize("Saving config:\n", "cyan", true));
+        fmt::print("{}\n", output);
+        if (!m_output_dir.empty()) {
+            std::ofstream f;
+            f.open(fs::path(m_output_dir) / "config.json");
+            f << output;
+            f.close();
+        }
+    }
+
 
     void log_tabular(const std::string &key, float val) {
         if (m_first_row) {
@@ -118,7 +159,7 @@ public:
         m_log_current_row[key] = val;
     }
 
-    void dump_tabular() {
+    virtual void dump_tabular() {
         const std::string delimiter = "\t";
 
         std::vector<int> key_lens;
@@ -177,6 +218,50 @@ protected:
 
 class EpochLogger : public Logger {
     using Logger::Logger;
+public:
+    void store(const std::map<std::string, std::vector<float>> &data) {
+        for (const auto &it : data) {
+            if (!m_epoch_dict.contains(it.first)) {
+                m_epoch_dict[it.first] = std::vector<float>();
+            }
+            m_epoch_dict[it.first].insert(m_epoch_dict[it.first].end(),
+                                          it.second.begin(),
+                                          it.second.end());
+        }
+    }
+
+    void log_tabular(const std::string &key, std::optional<float> val, bool with_min_and_max, bool average_only) {
+        if (val != std::nullopt) {
+            Logger::log_tabular(key, val.value());
+        } else {
+            auto v = m_epoch_dict.at(key);
+            auto stats = statistics_scalar(v, average_only, with_min_and_max);
+            for (const auto &it : stats) {
+                Logger::log_tabular(it.first + key, it.second);
+            }
+            m_epoch_dict[key].clear();
+        }
+    }
+
+    std::vector<float> get(const std::string &key) const {
+        return m_epoch_dict[key];
+    }
+
+    std::map<std::string, float> get_stats(const std::string &key, bool with_min_and_max, bool average_only) const {
+        auto v = m_epoch_dict.at(key);
+        auto stats = statistics_scalar(v, average_only, with_min_and_max);
+        return stats;
+    }
+
+    void dump_tabular() override {
+        Logger::dump_tabular();
+        for (const auto &it : m_epoch_dict) {
+            M_Assert(it.second.empty(), fmt::format("Key {} is not called using log_tabular\n", it.first).c_str());
+        }
+    }
+
+protected:
+    std::map<std::string, std::vector<float>> m_epoch_dict;
 };
 
 

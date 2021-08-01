@@ -4,8 +4,28 @@
 
 #include "gtest/gtest.h"
 #include "logger.h"
+#include "nlohmann/json.hpp"
 #include <iostream>
 #include <fmt/core.h>
+#include <fmt/ranges.h>
+
+TEST(common, optional) {
+    // the usage is very similar to Python None.
+    std::optional<float> val;
+    if (val == std::nullopt) {
+        fmt::print("Optional value is Nullopt\n");
+    } else {
+        fmt::print("Optional value is {}\n", val.value());
+    }
+    val = 12;
+    if (val == std::nullopt) {
+        fmt::print("Optional value is Nullopt\n");
+    } else {
+        fmt::print("Optional value is {}\n", val.value());
+    }
+    fmt::print("{}", statistics_scalar(std::vector<float> {1, 2, 3}, true));
+
+}
 
 TEST(print, color) {
     printf("\x1b[%sm%s\x1b[0m\n", "32", "dsdsd");
@@ -24,7 +44,12 @@ TEST(logger, main) {
     int seed = 1;
     auto output_dir = setup_logger_kwargs(exp_name, seed, data_dir);
     Logger logger(output_dir, exp_name);
-    for (int i = 1; i < 100; i++) {
+    json j;
+    j["learning_rate"] = 3.14;
+    j["num_steps"] = 2.5;
+    logger.save_config(j);
+    Logger::log("dsdsdsds");
+    for (int i = 1; i < 30; i++) {
         logger.log_tabular("Epoch", i);
         float performance = i + (rand() % 20) / 19;
         logger.log_tabular("AverageEpRet", performance);
