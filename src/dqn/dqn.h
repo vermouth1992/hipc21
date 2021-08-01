@@ -141,6 +141,7 @@ static void train_dqn(
         // torch
         torch::Device device
 ) {
+    torch::manual_seed(seed);
     // setup environment
     boost::shared_ptr<Gym::Environment> env = client->make(env_id);
     boost::shared_ptr<Gym::Environment> test_env = client->make(env_id);
@@ -557,7 +558,7 @@ void *learner_fn(void *params) {
             }
             {
                 torch::NoGradGuard no_grad;
-                for (int i = 0; i < agent->parameters().size(); i++) {
+                for (unsigned long i = 0; i < agent->parameters().size(); i++) {
                     auto target_param = actor->parameters().at(i);
                     auto param = agent->parameters().at(i);
                     target_param.data().copy_(param.data().to(cpu));

@@ -18,7 +18,7 @@
 
 #define MSG(x) std::cout << __FILENAME__ << ':' << __LINE__ << ':' << __func__ << "() : " << x << std::endl
 
-static void M_Assert_(const char *expr_str, bool expr, const char *file, int line, const char *msg) {
+static inline void M_Assert_(const char *expr_str, bool expr, const char *file, int line, const char *msg) {
     if (!expr) {
         std::cerr << "Assert failed:\t" << msg << "\n"
                   << "Expected:\t" << expr_str << "\n"

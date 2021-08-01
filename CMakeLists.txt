@@ -9,7 +9,11 @@ else ()
     set(CONDA_PATH $ENV{HOME}/miniconda3)
 endif (APPLE)
 
-set(LIBTORCH ${CONDA_PATH}/lib/python3.9/site-packages/torch/share/cmake)
+find_package(Python COMPONENTS Development Interpreter)
+
+message(STATUS "Found Python site-package library at ${Python_SITELIB}")
+
+set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 
@@ -17,6 +21,7 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
 
 include_directories("src" "${LIBTORCH}/include" "envs/binding-cpp" "third_party")
+link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
 add_subdirectory(Google_tests)
@@ -31,7 +36,8 @@ set(SOURCE_FILES
 
 add_executable(hipc21 ${SOURCE_FILES})
 
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" jsoncpp curl)
+find_package(fmt)
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" jsoncpp curl fmt::fmt)
 
 add_library(lib STATIC src/replay_buffer/SumTree.cpp src/replay_buffer/SumTree.h)
 
