@@ -37,7 +37,7 @@ void run_single_environment(
 TEST(env, basic) {
     try {
         std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
-        run_single_environment(client, "Pendulum-v0", 10);
+        run_single_environment(client, "Pendulum-v0", 1);
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());

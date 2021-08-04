@@ -7,8 +7,8 @@
 #include "nlohmann/json.hpp"
 #include "fmt/format.h"
 #include "gym/gym.h"
-#include <boost/beast/core/detail/base64.hpp>
 #include "base64.h"
+#include <fstream>
 
 using nlohmann::json;
 
@@ -46,4 +46,15 @@ TEST(Libtorch, serialization) {
     std::copy(s.begin(), s.end(), f.begin());
     torch::Tensor x = torch::pickle_load(f).toTensor();
     std::cout << x << std::endl;
+}
+
+TEST(Libtorch, cpp_to_python) {
+    torch::Tensor x = torch::rand({3, 4}, torch::TensorOptions().dtype(torch::kFloat32));
+    std::cout << x << std::endl;
+    std::vector<char> f = torch::pickle_save(x);
+    std::string result (f.begin(), f.end());
+//    std::string result = macaron::Base64::Encode(f);
+    std::ofstream out("../../tensor.pt");
+    out << result;
+    out.close();
 }

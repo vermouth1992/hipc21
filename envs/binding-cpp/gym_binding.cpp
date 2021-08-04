@@ -19,6 +19,13 @@ namespace Gym {
         return x;
     }
 
+    static std::string encode_tensor(const torch::Tensor &tensor) {
+        std::vector<char> f = torch::pickle_save(tensor);
+        // convert to base64
+        std::string result = macaron::Base64::Encode(f);
+        return result;
+    }
+
     static std::string require(const json &v, const std::string &k) {
         if (!v.is_object() || !v.contains(k))
             throw std::runtime_error("cannot find required parameter '" + k + "'");
@@ -206,10 +213,8 @@ namespace Gym {
             if (aspace->type == Space::DISCRETE) {
                 act_json["action"] = action.item<int64_t>();
             } else if (aspace->type == Space::BOX) {
-                // should have a more general function. Left for now.
-                json &array = act_json["action"];
-                for (int c = 0; c < (int) action.sizes()[0]; ++c)
-                    array[c] = action[c].item<float>();
+                // directly pass encoded torch tensor
+                act_json["action"] = encode_tensor(action);
             } else {
                 assert(0);
             }

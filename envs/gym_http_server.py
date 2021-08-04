@@ -26,6 +26,12 @@ def encode_tensor_base64(tensor: torch.Tensor) -> str:
     return encoded
 
 
+def decode_tensor(string: str) -> torch.Tensor:
+    decoded = base64.b64decode(string)
+    buffer = io.BytesIO(decoded)
+    return torch.load(buffer)
+
+
 ########## Container for environments ##########
 class Envs(object):
     """
@@ -81,7 +87,8 @@ class Envs(object):
         if isinstance(action, six.integer_types):
             nice_action = action
         else:
-            nice_action = np.array(action)
+            # decode it
+            nice_action = decode_tensor(action).numpy()
         if render:
             env.render()
         [observation, reward, done, info] = env.step(nice_action)
@@ -140,18 +147,6 @@ class Envs(object):
             info['matrix'] = [((float(x) if x != -np.inf else -1e100) if x != +np.inf else +1e100) for x in
                               np.array(space.matrix).flatten()]
         return info
-
-    def monitor_start(self, instance_id, directory, force, resume, video_callable):
-        env = self._lookup_env(instance_id)
-        if video_callable == False:
-            v_c = lambda count: False
-        else:
-            v_c = lambda count: count % video_callable == 0
-        self.envs[instance_id] = gym.wrappers.Monitor(env, directory, force=force, resume=resume, video_callable=v_c)
-
-    def monitor_close(self, instance_id):
-        env = self._lookup_env(instance_id)
-        env.close()
 
     def env_close(self, instance_id):
         env = self._lookup_env(instance_id)
