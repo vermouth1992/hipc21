@@ -8,13 +8,22 @@ import gym
 import numpy as np
 import six
 import argparse
-import sys
+import base64
 import json
+import torch
+import io
 
 import logging
 
 logger = logging.getLogger('werkzeug')
 logger.setLevel(logging.ERROR)
+
+
+def encode_tensor_base64(tensor: torch.Tensor) -> str:
+    b = io.BytesIO()
+    torch.save(tensor, b)
+    encoded = base64.b64encode(b.getvalue()).decode('ascii')
+    return encoded
 
 
 ########## Container for environments ##########
@@ -64,7 +73,8 @@ class Envs(object):
     def reset(self, instance_id):
         env = self._lookup_env(instance_id)
         obs = env.reset()
-        return env.observation_space.to_jsonable(obs)
+        obs_tensor = torch.from_numpy(obs)
+        return encode_tensor_base64(obs_tensor)
 
     def step(self, instance_id, action, render):
         env = self._lookup_env(instance_id)
@@ -75,8 +85,7 @@ class Envs(object):
         if render:
             env.render()
         [observation, reward, done, info] = env.step(nice_action)
-        obs_jsonable = env.observation_space.to_jsonable(observation)
-        return [obs_jsonable, reward, done, info]
+        return [encode_tensor_base64(torch.from_numpy(observation)), reward, done, info]
 
     def get_action_space_contains(self, instance_id, x):
         env = self._lookup_env(instance_id)
@@ -123,7 +132,9 @@ class Envs(object):
             # module can read and write such floats. So we only here fix "export version",
             # also make it flat.
             info['low'] = [(float(x) if x != -np.inf else -1e100) for x in np.array(space.low).flatten()]
+            info['low'] = encode_tensor_base64(torch.tensor(info['low']))
             info['high'] = [(float(x) if x != +np.inf else +1e100) for x in np.array(space.high).flatten()]
+            info['high'] = encode_tensor_base64(torch.tensor(info['high']))
         elif info['name'] == 'HighLow':
             info['num_rows'] = space.num_rows
             info['matrix'] = [((float(x) if x != -np.inf else -1e100) if x != +np.inf else +1e100) for x in
@@ -251,8 +262,6 @@ def env_reset(instance_id):
         - observation: the initial observation of the space
     """
     observation = envs.reset(instance_id)
-    if np.isscalar(observation):
-        observation = observation.item()
     return jsonify(observation=observation)
 
 
@@ -366,44 +375,6 @@ def env_observation_space_info(instance_id):
     return jsonify(info=info)
 
 
-@app.route('/v1/envs/<instance_id>/monitor/start/', methods=['POST'])
-def env_monitor_start(instance_id):
-    """
-    Start monitoring.
-
-    Parameters:
-        - instance_id: a short identifier (such as '3c657dbc')
-        for the environment instance
-        - force (default=False): Clear out existing training
-        data from this directory (by deleting every file
-        prefixed with "openaigym.")
-        - resume (default=False): Retain the training data
-        already in this directory, which will be merged with
-        our new data
-    """
-    j = request.get_json()
-
-    directory = get_required_param(j, 'directory')
-    force = get_optional_param(j, 'force', False)
-    resume = get_optional_param(j, 'resume', False)
-    video_callable = get_optional_param(j, 'video_callable', False)
-    envs.monitor_start(instance_id, directory, force, resume, video_callable)
-    return ('', 204)
-
-
-@app.route('/v1/envs/<instance_id>/monitor/close/', methods=['POST'])
-def env_monitor_close(instance_id):
-    """
-    Flush all monitor data to disk.
-
-    Parameters:
-        - instance_id: a short identifier (such as '3c657dbc')
-          for the environment instance
-    """
-    envs.monitor_close(instance_id)
-    return ('', 204)
-
-
 @app.route('/v1/envs/<instance_id>/close/', methods=['POST'])
 def env_close(instance_id):
     """
@@ -415,33 +386,6 @@ def env_close(instance_id):
     """
     envs.env_close(instance_id)
     return ('', 204)
-
-
-@app.route('/v1/upload/', methods=['POST'])
-def upload():
-    """
-    Upload the results of training (as automatically recorded by
-    your env's monitor) to OpenAI Gym.
-
-    Parameters:
-        - training_dir: A directory containing the results of a
-        training run.
-        - api_key: Your OpenAI API key
-        - algorithm_id (default=None): An arbitrary string
-        indicating the paricular version of the algorithm
-        (including choices of parameters) you are running.
-        """
-    j = request.get_json()
-    training_dir = get_required_param(j, 'training_dir')
-    api_key = get_required_param(j, 'api_key')
-    algorithm_id = get_optional_param(j, 'algorithm_id', None)
-
-    try:
-        gym.upload(training_dir, algorithm_id, writeup=None, api_key=api_key,
-                   ignore_open_monitors=False)
-        return ('', 204)
-    except gym.error.AuthenticationError:
-        raise InvalidUsage('You must provide an OpenAI Gym API key')
 
 
 @app.route('/v1/shutdown/', methods=['POST'])

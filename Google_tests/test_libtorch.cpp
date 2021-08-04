@@ -4,6 +4,13 @@
 
 #include <gtest/gtest.h>
 #include <torch/torch.h>
+#include "nlohmann/json.hpp"
+#include "fmt/format.h"
+#include "gym/gym.h"
+#include <boost/beast/core/detail/base64.hpp>
+#include "base64.h"
+
+using nlohmann::json;
 
 torch::Tensor same(const torch::Tensor &tensor) {
     return tensor;
@@ -24,4 +31,19 @@ TEST(Libtorch, tensor_return) {
 
     std::cout << &tensor << " " << &tensor1 << std::endl;
     std::cout << tensor.data_ptr() << " " << tensor1.data_ptr() << std::endl;
+}
+
+
+TEST(Libtorch, serialization) {
+    // read file
+    std::ifstream input("../../tensor.pt");
+    std::string str((std::istreambuf_iterator<char>(input)),
+                    std::istreambuf_iterator<char>());
+    std::string s;
+    // b64decode
+    macaron::Base64::Decode(str, s);
+    std::vector<char> f(s.length());
+    std::copy(s.begin(), s.end(), f.begin());
+    torch::Tensor x = torch::pickle_load(f).toTensor();
+    std::cout << x << std::endl;
 }

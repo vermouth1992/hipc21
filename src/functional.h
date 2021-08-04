@@ -130,7 +130,14 @@ public:
         m_start_time = std::chrono::high_resolution_clock::now();
     }
 
+    void lap() {
+        // not accumulative
+        auto end_time = std::chrono::high_resolution_clock::now();
+        m_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - m_start_time).count();
+    }
+
     void stop() {
+        // accumulate. Need to restart
         auto end_time = std::chrono::high_resolution_clock::now();
         m_elapsed += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - m_start_time).count();
     }

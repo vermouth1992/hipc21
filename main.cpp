@@ -3,7 +3,7 @@
 //
 
 #include "include/gym/gym.h"
-#include "dqn/dqn.h"
+#include "agent/dqn.h"
 #include "cxxopts.hpp"
 #include "functional.h"
 #include "logger.h"

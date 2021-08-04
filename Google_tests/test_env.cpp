@@ -1,4 +1,9 @@
-#include "include/gym/gym.h"
+//
+// Created by Chi Zhang on 8/2/21.
+//
+
+#include "gtest/gtest.h"
+#include "gym/gym.h"
 #include <iostream>
 
 static
@@ -16,10 +21,9 @@ void run_single_environment(
         env->reset(&s);
         float total_reward = 0;
         int total_steps = 0;
-        while (1) {
-            std::vector<float> action = action_space->sample();
+        while (true) {
+            auto action = action_space->sample();
             env->step(action, false, &s);
-            assert(s.observation.size() == observation_space->sample().size());
             total_reward += s.reward;
             total_steps += 1;
             if (s.done) break;
@@ -29,15 +33,12 @@ void run_single_environment(
     }
 }
 
-int main(int argc, char **argv) {
+TEST(env, basic) {
     try {
         boost::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
-        run_single_environment(client, "Pong-v4", 10);
+        run_single_environment(client, "CartPole-v1", 10);
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());
-        return 1;
     }
-
-    return 0;
 }

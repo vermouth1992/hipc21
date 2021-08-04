@@ -1,8 +1,9 @@
 # High Performance Parallel Reinforcement Learning Implementation in C++ 
 ## Dependencies
-- Pytorch
-- JsonCPP
+- Pytorch C++
+- nlohmann_json
 
 ```bash
-conda install jsoncpp fmt
+conda install fmt
+conda install -c conda-forge nlohmann_json
 ```

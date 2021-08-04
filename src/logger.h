@@ -72,7 +72,7 @@ static std::map<std::string, float> statistics_scalar(const std::vector<T> &v,
 
 static std::string setup_logger_kwargs(
         const std::string &exp_name,
-        int seed,
+        int64_t seed,
         const std::string &data_dir
 ) {
     /*
@@ -230,7 +230,8 @@ public:
         }
     }
 
-    void log_tabular(const std::string &key, std::optional<float> val, bool with_min_and_max, bool average_only) {
+    void log_tabular(const std::string &key, std::optional<float> val, bool with_min_and_max = false,
+                     bool average_only = false) {
         if (val != std::nullopt) {
             Logger::log_tabular(key, val.value());
         } else {
@@ -244,7 +245,7 @@ public:
     }
 
     std::vector<float> get(const std::string &key) const {
-        return m_epoch_dict[key];
+        return m_epoch_dict.at(key);
     }
 
     std::map<std::string, float> get_stats(const std::string &key, bool with_min_and_max, bool average_only) const {
