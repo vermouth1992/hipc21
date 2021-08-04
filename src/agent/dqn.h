@@ -8,7 +8,7 @@
 #include <torch/torch.h>
 #include <utility>
 #include "functional.h"
-#include "include/gym/gym.h"
+#include "gym/gym.h"
 #include "replay_buffer/replay_buffer.h"
 #include "common.h"
 #include "agent/off_policy_agent.h"
@@ -119,7 +119,7 @@ class AtariDQN : public DQN {
 
 
 struct ActorParam {
-    boost::shared_ptr<Gym::Environment> env;
+    std::shared_ptr<Gym::Environment> env;
     std::shared_ptr<PrioritizedReplayBuffer> replay_buffer;
     std::shared_ptr<MlpDQN> agent; // the agent should live on CPU
     std::shared_ptr<pthread_mutex_t> actor_mutex;
@@ -131,7 +131,7 @@ struct ActorParam {
     int64_t start_steps;
     float epsilon_greedy;
 
-    ActorParam(boost::shared_ptr<Gym::Environment> env_,
+    ActorParam(std::shared_ptr<Gym::Environment> env_,
                std::shared_ptr<PrioritizedReplayBuffer> replay_buffer_,
                std::shared_ptr<MlpDQN> agent_,
                std::shared_ptr<pthread_mutex_t> actor_mutex_,
@@ -172,8 +172,8 @@ void *actor_fn(void *params) {
     auto start_steps = actor_params->start_steps;
     auto buffer_mutex = actor_params->buffer_mutex;
 
-    boost::shared_ptr<Gym::Space> action_space = env->action_space();
-    boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
+    std::shared_ptr<Gym::Space> action_space = env->action_space();
+    std::shared_ptr<Gym::Space> observation_space = env->observation_space();
 
     int64_t global_steps_temp;
     Gym::State s;
@@ -359,7 +359,7 @@ void *learner_fn(void *params) {
 }
 
 static void train_dqn_parallel(
-        const std::vector<boost::shared_ptr<Gym::Client>> &clients,
+        const std::vector<std::shared_ptr<Gym::Client>> &clients,
         const std::string &env_id,
         int64_t epochs,
         int64_t steps_per_epoch,
@@ -388,15 +388,15 @@ static void train_dqn_parallel(
         int64_t num_actors
 ) {
     // create dummy environment
-    std::vector<boost::shared_ptr<Gym::Environment>> envs;
+    std::vector<std::shared_ptr<Gym::Environment>> envs;
     envs.reserve(num_actors);
     for (int i = 0; i < num_actors; ++i) {
         envs.push_back(clients.at(i)->make(env_id));
     }
 
     auto env = envs.at(0);
-    boost::shared_ptr<Gym::Space> action_space = env->action_space();
-    boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
+    std::shared_ptr<Gym::Space> action_space = env->action_space();
+    std::shared_ptr<Gym::Space> observation_space = env->observation_space();
     // create agent
     auto obs_dim = (int64_t) observation_space->box_low.size();
     int64_t act_dim = action_space->discreet_n;

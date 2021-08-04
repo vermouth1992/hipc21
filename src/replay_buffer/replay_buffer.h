@@ -30,15 +30,15 @@ public:
     explicit ReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec, int64_t batch_size);
 
     // pure virtual function
-    virtual std::shared_ptr<torch::Tensor> generate_idx() const = 0;
+    [[nodiscard]] virtual std::shared_ptr<torch::Tensor> generate_idx() const = 0;
 
     std::unique_ptr<str_to_tensor> sample();
 
     void reset();
 
-    int64_t size() const;
+    [[nodiscard]] int64_t size() const;
 
-    int64_t capacity() const;
+    [[nodiscard]] int64_t capacity() const;
 
     std::unique_ptr<str_to_tensor> operator[](const torch::Tensor &idx);
 
@@ -62,7 +62,7 @@ public:
     explicit UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
                                  int64_t batch_size);
 
-    std::shared_ptr<torch::Tensor> generate_idx() const override;
+    [[nodiscard]] std::shared_ptr<torch::Tensor> generate_idx() const override;
 
 
 };
@@ -73,9 +73,9 @@ public:
     explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
                                      int64_t batch_size, float alpha);
 
-    std::shared_ptr<torch::Tensor> generate_idx() const override;
+    [[nodiscard]] std::shared_ptr<torch::Tensor> generate_idx() const override;
 
-    std::shared_ptr<torch::Tensor> get_weights(const torch::Tensor &idx, float beta) const;
+    [[nodiscard]] std::shared_ptr<torch::Tensor> get_weights(const torch::Tensor &idx, float beta) const;
 
     void update_priorities(const torch::Tensor &idx, const torch::Tensor &priorities);
 

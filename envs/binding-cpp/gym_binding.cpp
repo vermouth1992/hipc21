@@ -8,9 +8,6 @@
 using nlohmann::json;
 
 namespace Gym {
-
-    static bool verbose = false;
-
     static torch::Tensor decode_base64_to_tensor(const std::string &str) {
         std::vector<char> f;
         // b64decode
@@ -76,7 +73,7 @@ namespace Gym {
         return bytes;
     }
 
-    class ClientReal : public Client, public std::enable_shared_from_this<ClientReal> {
+    class ClientReal final : public Client, public std::enable_shared_from_this<ClientReal> {
     public:
         std::string addr;
         int port{};
@@ -99,13 +96,12 @@ namespace Gym {
 //            h.reset(c, std::ptr_fun(curl_easy_cleanup));
             h.reset(c, [](CURL *curl) { curl_easy_cleanup(curl); });
 //            headers.reset(curl_slist_append(0, "Content-Type: application/json"), std::ptr_fun(curl_slist_free_all));
-            headers.reset(curl_slist_append(0, "Content-Type: application/json"),
+            headers.reset(curl_slist_append(nullptr, "Content-Type: application/json"),
                           [](struct curl_slist *l) { curl_slist_free_all(l); });
         }
 
         json GET(const std::string &route) {
             std::string url = "http://" + addr + route;
-            if (verbose) printf("GET %s\n", url.c_str());
             curl_easy_setopt(h.get(), CURLOPT_URL, url.c_str());
             curl_easy_setopt(h.get(), CURLOPT_PORT, port);
             std::string answer;
@@ -124,7 +120,6 @@ namespace Gym {
 
         json POST(const std::string &route, const std::string &post_data) {
             std::string url = "http://" + addr + route;
-            if (verbose) printf("POST %s\n%s\n", url.c_str(), post_data.c_str());
             curl_easy_setopt(h.get(), CURLOPT_URL, url.c_str());
             curl_easy_setopt(h.get(), CURLOPT_PORT, port);
             std::string answer;
@@ -146,8 +141,6 @@ namespace Gym {
             long response_code;
             CURLcode r = curl_easy_getinfo(h.get(), CURLINFO_RESPONSE_CODE, &response_code);
             if (r) throw std::runtime_error(curl_error_buf.data());
-            if (verbose) printf("%i\n%s\n", (int) response_code, answer.c_str());
-
             std::string parse_error;
             j = json::parse(answer);
             if (!j.is_object()) {
@@ -179,7 +172,7 @@ namespace Gym {
 
 // environment
 
-    class EnvironmentReal : public Environment {
+    class EnvironmentReal final : public Environment {
     public:
         std::string instance_id;
         std::shared_ptr<ClientReal> client;
@@ -232,7 +225,6 @@ namespace Gym {
         req["env_id"] = env_id;
         json ans = POST("/v1/envs/", req.dump());
         std::string instance_id = require(ans, "instance_id");
-        if (verbose) printf(" * created %s instance_id=%s\n", env_id.c_str(), instance_id.c_str());
         std::shared_ptr<EnvironmentReal> env(new EnvironmentReal);
         env->client = shared_from_this();
         env->instance_id = instance_id;

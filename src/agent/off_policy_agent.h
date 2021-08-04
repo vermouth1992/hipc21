@@ -57,20 +57,9 @@ protected:
 };
 
 
-template<typename T>
-static inline std::vector<T> convert_tensor_to_vector(const torch::Tensor &tensor) {
-    return std::vector<T>(tensor.data_ptr<T>(), tensor.data_ptr<T>() + tensor.numel())
-}
-
-// note that this doesn't create a new copy of the data. The tensor is simply pointing to the storage owned by data.
-template<typename T>
-static inline torch::Tensor convert_vector_to_tensor(const std::vector<T> &data) {
-    return torch::from_blob(data.data(), {(int64_t) data.size()});
-}
-
 // off-policy trainer for low dimensional observation environments
 static void off_policy_trainer(
-        const boost::shared_ptr<Gym::Client> &client,
+        const std::shared_ptr<Gym::Client> &client,
         const std::string &env_id,
         std::optional<std::string> &exp_name,
         const std::string &data_dir,
@@ -101,26 +90,24 @@ static void off_policy_trainer(
 
     torch::manual_seed(seed);
     // setup environment
-    boost::shared_ptr<Gym::Environment> env = client->make(env_id);
-    boost::shared_ptr<Gym::Environment> test_env = client->make(env_id);
-    boost::shared_ptr<Gym::Space> action_space = env->action_space();
-    boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
+    std::shared_ptr<Gym::Environment> env = client->make(env_id);
+    std::shared_ptr<Gym::Environment> test_env = client->make(env_id);
+    std::shared_ptr<Gym::Space> action_space = env->action_space();
+    std::shared_ptr<Gym::Space> observation_space = env->observation_space();
 
-    auto obs_dim = (int64_t) observation_space->box_low.size();
-
-    DataSpec action_dataspec;
+    std::unique_ptr<DataSpec> action_dataspec;
     if (action_space->type == action_space->DISCRETE) {
-        action_dataspec = DataSpec({}, torch::kInt64);
+        action_dataspec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
     } else {
-        action_dataspec = DataSpec({(int64_t) action_space->box_low.size()}, torch::kFloat32);
+        action_dataspec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
     }
     // setup agent
     agent.to(device);
     // setup replay buffer
     ReplayBuffer::str_to_dataspec data_spec{
-            {"obs",      DataSpec({obs_dim}, torch::kFloat32)},
-            {"act",      action_dataspec},
-            {"next_obs", DataSpec({obs_dim}, torch::kFloat32)},
+            {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
+            {"act",      *action_dataspec},
+            {"next_obs", DataSpec(observation_space->box_shape, torch::kFloat32)},
             {"rew",      DataSpec({}, torch::kFloat32)},
             {"done",     DataSpec({}, torch::kFloat32)},
     };
@@ -220,12 +207,9 @@ static void off_policy_trainer(
             float test_episode_reward = 0;
             float test_episode_length = 0;
             while (true) {
-                auto obs_tensor = torch::from_blob(test_s.observation.data(), {(int64_t) test_s.observation.size()});
+                auto obs_tensor = s.observation;
                 auto tensor_action = agent.act_single(obs_tensor.to(device), false).to(cpu).to(torch::kFloat32);  //
-                std::vector<float> vector_action(tensor_action.data_ptr<float>(),
-                                                 tensor_action.data_ptr<float>() + tensor_action.numel());
-                test_env->step(vector_action, false, &test_s);
-                assert(test_s.observation.size() == observation_space->sample().size());
+                test_env->step(tensor_action, false, &test_s);
                 test_episode_reward += test_s.reward;
                 test_episode_length += 1;
                 if (test_s.done) break;
