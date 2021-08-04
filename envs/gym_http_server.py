@@ -71,6 +71,7 @@ class Envs(object):
 
         instance_id = str(uuid.uuid4().hex)[:self.id_len]
         self.envs[instance_id] = env
+        print(self.list_all())
         return instance_id
 
     def list_all(self):
@@ -152,6 +153,7 @@ class Envs(object):
         env = self._lookup_env(instance_id)
         env.close()
         self._remove_env(instance_id)
+        print(self.list_all())
 
 
 ########## App setup ##########
@@ -380,7 +382,8 @@ def env_close(instance_id):
           for the environment instance
     """
     envs.env_close(instance_id)
-    return ('', 204)
+    response = f"Successfully close instance {instance_id}"
+    return jsonify(info=response)
 
 
 @app.route('/v1/shutdown/', methods=['POST'])
@@ -388,7 +391,7 @@ def shutdown():
     """ Request a server shutdown - currently used by the integration tests to repeatedly create and destroy fresh copies of the server running in a separate thread"""
     f = request.environ.get('werkzeug.server.shutdown')
     f()
-    return 'Server shutting down'
+    return jsonify(info='Server shutting down')
 
 
 if __name__ == '__main__':

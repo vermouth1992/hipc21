@@ -32,6 +32,7 @@ void run_single_environment(
         printf("%s episode %i finished in %i steps with reward %0.2f\n",
                env_id.c_str(), e, total_steps, total_reward);
     }
+    env->close();
 }
 
 TEST(env, basic) {

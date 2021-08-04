@@ -52,6 +52,8 @@ namespace Gym {
         virtual void reset(State *save_initial_state_here) = 0;
 
         virtual void step(const torch::Tensor &action, bool render, State *save_state_here) = 0;
+
+        virtual void close() = 0;
     };
 
     class Client {

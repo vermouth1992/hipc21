@@ -218,6 +218,11 @@ namespace Gym {
             save_state_here->timeout = ans["timeout"].get<bool>();
             save_state_here->reward = ans["reward"].get<float>();
         }
+
+        void close() override {
+            json j;
+            client->POST("/v1/envs/" + instance_id + "/close/", j.dump());
+        }
     };
 
     std::shared_ptr<Environment> ClientReal::make(const std::string &env_id) {
