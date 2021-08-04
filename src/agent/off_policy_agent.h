@@ -145,24 +145,20 @@ static void off_policy_trainer(
     for (int epoch = 1; epoch <= epochs; epoch++) {
         for (int step = 0; step < steps_per_epoch; step++) {
             // compute action
-            std::unique_ptr<std::vector<float>> action;
+            torch::Tensor action;
             // copy observation
             auto current_obs = s.observation;
-            auto obs_tensor = convert_vector_to_tensor(current_obs);
             if (total_steps < start_steps) {
-                action = std::make_unique<std::vector<float>>(action_space->sample());
+                action = action_space->sample();
             } else {
-                auto tensor_action = agent.act_single(obs_tensor.to(device), true).to(cpu).to(torch::kFloat32);
-                action = std::make_unique<std::vector<float>>(convert_tensor_to_vector<float>(tensor_action));
+                action = agent.act_single(current_obs.to(device), true).to(cpu).to(torch::kFloat32);
             }
 
             // environment step
-            env->step(*action, false, &s);
+            env->step(action, false, &s);
 
             // TODO: need to see if it is true done or done due to reaching the maximum length.
             // convert data type
-            auto action_tensor = convert_vector_to_tensor(*action);
-            auto next_obs_tensor = convert_vector_to_tensor(s.observation);
             auto reward_tensor = torch::tensor({s.reward});
             bool true_done = s.done & (!s.timeout);
             auto done_tensor = torch::tensor({true_done},
@@ -170,9 +166,9 @@ static void off_policy_trainer(
 
             // store data to the replay buffer
             buffer.add_single({
-                                      {"obs",      obs_tensor},
-                                      {"act",      action_tensor},
-                                      {"next_obs", next_obs_tensor},
+                                      {"obs",      current_obs},
+                                      {"act",      action},
+                                      {"next_obs", s.observation},
                                       {"rew",      reward_tensor},
                                       {"done",     done_tensor}
                               });

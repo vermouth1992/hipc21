@@ -1,7 +1,6 @@
 #ifndef __GYM_H__
 #define __GYM_H__
-// Caffe uses boost::shared_ptr (as opposed to std::shared_ptr), so do we.
-#include <boost/shared_ptr.hpp>
+
 #include <vector>
 #include <string>
 #include <random>
@@ -46,9 +45,9 @@ namespace Gym {
 
     class Environment {
     public:
-        virtual boost::shared_ptr<Space> action_space() = 0;
+        virtual std::shared_ptr<Space> action_space() = 0;
 
-        virtual boost::shared_ptr<Space> observation_space() = 0;
+        virtual std::shared_ptr<Space> observation_space() = 0;
 
         virtual void reset(State *save_initial_state_here) = 0;
 
@@ -57,10 +56,10 @@ namespace Gym {
 
     class Client {
     public:
-        virtual boost::shared_ptr<Environment> make(const std::string &name) = 0;
+        virtual std::shared_ptr<Environment> make(const std::string &name) = 0;
     };
 
-    extern boost::shared_ptr<Client> client_create(const std::string &addr, int port);
+    extern std::shared_ptr<Client> client_create(const std::string &addr, int port);
 
 } // namespace
 
