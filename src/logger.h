@@ -186,7 +186,9 @@ public:
         for (unsigned long i = 0; i < m_log_headers.size(); i++) {
             auto key = m_log_headers.at(i);
             auto val = m_log_current_row.at(key);
-            fmt::print("| {:>{}} | {:>15} |\n", key, max_key_len, val);
+            // format val
+            auto val_str = fmt::format("{:8.3g}", val);
+            fmt::print("| {:>{}} | {:>15} |\n", key, max_key_len, val_str);
             if (!m_output_dir.empty()) {
                 m_output_file << val;
                 if (i != m_log_headers.size() - 1) {
@@ -216,7 +218,7 @@ protected:
     const std::string m_exp_name;
 };
 
-class EpochLogger : public Logger {
+class EpochLogger final : public Logger {
     using Logger::Logger;
 public:
     void store(const std::map<std::string, std::vector<float>> &data) {

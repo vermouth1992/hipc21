@@ -13,6 +13,9 @@ namespace Gym {
         // b64decode
         macaron::Base64::Decode(str, f);
         torch::Tensor x = torch::pickle_load(f).toTensor();
+        if (x.dtype() == torch::kFloat64) {
+            return x.to(torch::kFloat32);
+        }
         return x;
     }
 
@@ -85,7 +88,7 @@ namespace Gym {
         ClientReal() {
             CURL *c = curl_easy_init();
             curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1);
-            curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT_MS, 3000);
+            curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT_MS, 60000);
             curl_easy_setopt(c, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, true);
             curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0);
@@ -169,7 +172,6 @@ namespace Gym {
         return client;
     }
 
-
 // environment
 
     class EnvironmentReal final : public Environment {
@@ -233,6 +235,7 @@ namespace Gym {
         std::shared_ptr<EnvironmentReal> env(new EnvironmentReal);
         env->client = shared_from_this();
         env->instance_id = instance_id;
+        env->env_id = env_id;
         return env;
     }
 

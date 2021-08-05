@@ -45,6 +45,8 @@ namespace Gym {
 
     class Environment {
     public:
+        std::string env_id;
+
         virtual std::shared_ptr<Space> action_space() = 0;
 
         virtual std::shared_ptr<Space> observation_space() = 0;

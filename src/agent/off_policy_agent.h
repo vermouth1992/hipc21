@@ -59,9 +59,9 @@ protected:
 
 // off-policy trainer for low dimensional observation environments
 static void off_policy_trainer(
-        const std::shared_ptr<Gym::Client> &client,
-        const std::string &env_id,
-        std::optional<std::string> &exp_name,
+        const std::shared_ptr<Gym::Environment> &env,
+        const std::shared_ptr<Gym::Environment> &test_env,
+        std::optional<std::string> exp_name,
         const std::string &data_dir,
         int64_t epochs,
         int64_t steps_per_epoch,
@@ -76,22 +76,20 @@ static void off_policy_trainer(
         // replay buffer
         int64_t replay_size,
         // agent parameters
-        OffPolicyAgent &agent,
+        const std::shared_ptr<OffPolicyAgent> &agent,
         // torch
         torch::Device device
 ) {
     // setup logger
     if (exp_name == std::nullopt) {
-        exp_name.emplace(env_id + "_" + std::string(typeid(agent).name()));
+        exp_name.emplace(env->env_id + "_" + std::string(typeid(*agent).name()));
     }
     auto output_dir = setup_logger_kwargs(exp_name.value(), seed, data_dir);
     std::shared_ptr<EpochLogger> logger = std::make_shared<EpochLogger>(output_dir, exp_name.value());
-    agent.set_logger(logger);
+    agent->set_logger(logger);
 
     torch::manual_seed(seed);
     // setup environment
-    std::shared_ptr<Gym::Environment> env = client->make(env_id);
-    std::shared_ptr<Gym::Environment> test_env = client->make(env_id);
     std::shared_ptr<Gym::Space> action_space = env->action_space();
     std::shared_ptr<Gym::Space> observation_space = env->observation_space();
 
@@ -102,7 +100,7 @@ static void off_policy_trainer(
         action_dataspec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
     }
     // setup agent
-    agent.to(device);
+    agent->to(device);
     // setup replay buffer
     ReplayBuffer::str_to_dataspec data_spec{
             {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
@@ -130,6 +128,8 @@ static void off_policy_trainer(
     watcher.start();
 
     for (int epoch = 1; epoch <= epochs; epoch++) {
+//        std::cout << "Training at Epoch " << epoch << std::endl;
+
         for (int step = 0; step < steps_per_epoch; step++) {
             // compute action
             torch::Tensor action;
@@ -138,7 +138,7 @@ static void off_policy_trainer(
             if (total_steps < start_steps) {
                 action = action_space->sample();
             } else {
-                action = agent.act_single(current_obs.to(device), true).to(cpu).to(torch::kFloat32);
+                action = agent->act_single(current_obs.to(device), true).to(cpu);
             }
 
             // environment step
@@ -183,14 +183,14 @@ static void off_policy_trainer(
                         // retrieve the actual data
                         auto data = *buffer[*idx];
                         // training
-                        agent.train_step(data["obs"].to(device),
-                                         data["act"].to(device),
-                                         data["next_obs"].to(device),
-                                         data["rew"].to(device),
-                                         data["done"].to(device),
-                                         std::nullopt);
+                        agent->train_step(data["obs"].to(device),
+                                          data["act"].to(device),
+                                          data["next_obs"].to(device),
+                                          data["rew"].to(device),
+                                          data["done"].to(device),
+                                          std::nullopt);
                         if (i % policy_delay == 0) {
-                            agent.update_target(true);
+                            agent->update_target(true);
                         }
                     }
                 }
@@ -200,15 +200,16 @@ static void off_policy_trainer(
             total_steps += 1;
         }
 
+//        std::cout << "Testing at Epoch " << epoch << std::endl;
         // test the current policy
         for (int i = 0; i < num_test_episodes; ++i) {
+//            std::cout << "Test iteration " << i << std::endl;
             // testing variables
             test_env->reset(&test_s);
             float test_episode_reward = 0;
             float test_episode_length = 0;
             while (true) {
-                auto obs_tensor = s.observation;
-                auto tensor_action = agent.act_single(obs_tensor.to(device), false).to(cpu).to(torch::kFloat32);  //
+                auto tensor_action = agent->act_single(test_s.observation.to(device), false).to(cpu);
                 test_env->step(tensor_action, false, &test_s);
                 test_episode_reward += test_s.reward;
                 test_episode_length += 1;
@@ -217,6 +218,8 @@ static void off_policy_trainer(
             test_reward_result[i] = test_episode_reward;
             test_length_result[i] = test_episode_length;
         }
+//        std::cout << "Finish testing at Epoch " << epoch << std::endl;
+
         logger->store({
                               {"TestEpRet", test_reward_result},
                               {"TestEpLen", test_length_result}
@@ -232,7 +235,7 @@ static void off_policy_trainer(
         logger->log_tabular("TotalEnvInteracts", (float) total_steps);
         logger->log_tabular("TestEpRet", std::nullopt, true);
         logger->log_tabular("TestEpLen", std::nullopt, false, true);
-        agent.log_tabular();
+        agent->log_tabular();
         logger->log_tabular("Time", (float) watcher.seconds());
         logger->dump_tabular();
     }
