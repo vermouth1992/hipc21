@@ -5,9 +5,8 @@
 #include <gtest/gtest.h>
 #include <torch/torch.h>
 #include "nlohmann/json.hpp"
-#include "fmt/format.h"
-#include "gym/gym.h"
 #include "base64.h"
+#include "nn/functional.h"
 #include <fstream>
 
 using nlohmann::json;
@@ -52,9 +51,16 @@ TEST(Libtorch, cpp_to_python) {
     torch::Tensor x = torch::rand({3, 4}, torch::TensorOptions().dtype(torch::kFloat32));
     std::cout << x << std::endl;
     std::vector<char> f = torch::pickle_save(x);
-    std::string result (f.begin(), f.end());
+    std::string result(f.begin(), f.end());
 //    std::string result = macaron::Base64::Encode(f);
     std::ofstream out("../../tensor.pt");
     out << result;
     out.close();
+}
+
+TEST(Libtorch, sequential) {
+    auto model = build_mlp();
+    auto tensor = torch::randn({100, 10});
+    auto output = model->forward(tensor);
+    std::cout << output.sizes() << std::endl;
 }

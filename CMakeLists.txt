@@ -32,10 +32,11 @@ set(SOURCE_FILES
         envs/binding-cpp/gym_binding.cpp
         src/replay_buffer/replay_buffer.cpp
         src/replay_buffer/segment_tree.cpp
-        src/agent/dqn.h
-        src/agent/off_policy_agent.h
+        src/agent/dqn.cpp
         main.cpp
-        src/replay_buffer/SumTree.cpp)
+        src/replay_buffer/SumTree.cpp
+        src/agent/sac.cpp src/agent/dqn.cpp
+        src/agent/td3.cpp src/nn/linear.cpp src/nn/linear.h src/utils/scheduler.cpp src/utils/scheduler.h src/nn/functional.cpp src/nn/functional.h src/nn/activation.cpp src/nn/activation.h src/nn/layers.h src/nn/squeeze.cpp src/nn/squeeze.h src/utils/stop_watcher.cpp src/utils/stop_watcher.h src/agent/off_policy_agent.cpp src/nn/value_net.cpp src/nn/value_net.h src/nn/stack_sequential.cpp src/nn/stack_sequential.h)
 
 add_executable(hipc21 ${SOURCE_FILES})
 
