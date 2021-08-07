@@ -5,6 +5,7 @@
 
 #include "agent/dqn.h"
 #include "agent/td3.h"
+#include "trainer/off_policy_trainer.h"
 #include "fmt/core.h"
 #include "cxxopts.hpp"
 
@@ -84,30 +85,33 @@ int main(int argc, char **argv) {
 
         agent->to(device);
 
-        off_policy_trainer(env,
-                           test_env,
-                           std::nullopt,
-                           "data",
-                           result["epochs"].as<int64_t>(),
-                           result["steps_per_epoch"].as<int64_t>(),
-                           result["start_steps"].as<int64_t>(),
-                           result["update_after"].as<int64_t>(),
-                           result["update_every"].as<int64_t>(),
-                           result["update_per_step"].as<int64_t>(),
-                           result["policy_delay"].as<int64_t>(),
-                           result["batch_size"].as<int64_t>(),
-                           result["num_test_episodes"].as<int64_t>(),
-                           result["seed"].as<int64_t>(),
-                           result["replay_size"].as<int64_t>(),
-                           agent,
-                           device
+        OffPolicyTrainer trainer(env,
+                                 test_env,
+                                 agent,
+                                 result["epochs"].as<int64_t>(),
+                                 result["steps_per_epoch"].as<int64_t>(),
+                                 result["start_steps"].as<int64_t>(),
+                                 result["update_after"].as<int64_t>(),
+                                 result["update_every"].as<int64_t>(),
+                                 result["update_per_step"].as<int64_t>(),
+                                 result["policy_delay"].as<int64_t>(),
+                                 result["num_test_episodes"].as<int64_t>(),
+                                 device,
+                                 result["seed"].as<int64_t>()
         );
-        return 0;
+
+        trainer.setup_logger(std::nullopt, "data");
+        trainer.setup_replay_buffer(result["replay_size"].as<int64_t>(), result["batch_size"].as<int64_t>());
+        trainer.train();
+
+        env->close();
+        test_env->close();
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());
         return 1;
     }
+
     delete[]real_argv;
 
     return 0;

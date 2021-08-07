@@ -47,29 +47,4 @@ protected:
 };
 
 
-// off-policy trainer for low dimensional observation environments
-void off_policy_trainer(
-        const std::shared_ptr<Gym::Environment> &env,
-        const std::shared_ptr<Gym::Environment> &test_env,
-        std::optional<std::string> exp_name,
-        const std::string &data_dir,
-        int64_t epochs,
-        int64_t steps_per_epoch,
-        int64_t start_steps,
-        int64_t update_after,
-        int64_t update_every,
-        int64_t update_per_step,
-        int64_t policy_delay,
-        int64_t batch_size,
-        int64_t num_test_episodes,
-        int64_t seed,
-        // replay buffer
-        int64_t replay_size,
-        // agent parameters
-        const std::shared_ptr<OffPolicyAgent> &agent,
-        // torch
-        torch::Device device
-);
-
-
 #endif //HIPC21_OFF_POLICY_AGENT_H

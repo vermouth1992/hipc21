@@ -57,7 +57,7 @@ protected:
 };
 
 
-class UniformReplayBuffer : public ReplayBuffer {
+class UniformReplayBuffer final : public ReplayBuffer {
 public:
     explicit UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
                                  int64_t batch_size);
@@ -68,7 +68,7 @@ public:
 };
 
 
-class PrioritizedReplayBuffer : public ReplayBuffer {
+class PrioritizedReplayBuffer final : public ReplayBuffer {
 public:
     explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
                                      int64_t batch_size, float alpha);
