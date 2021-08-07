@@ -221,6 +221,20 @@ protected:
 class EpochLogger final : public Logger {
     using Logger::Logger;
 public:
+    void store(const std::string &name, const std::vector<float> &data) {
+        if (!m_epoch_dict.contains(name)) {
+            m_epoch_dict[name] = std::vector<float>();
+        }
+        m_epoch_dict[name].insert(m_epoch_dict[name].end(), data.begin(), data.end());
+    }
+
+    void store(const std::string &name, const float data) {
+        if (!m_epoch_dict.contains(name)) {
+            m_epoch_dict[name] = std::vector<float>();
+        }
+        m_epoch_dict[name].push_back(data);
+    }
+
     void store(const std::map<std::string, std::vector<float>> &data) {
         for (const auto &it : data) {
             if (!m_epoch_dict.contains(it.first)) {

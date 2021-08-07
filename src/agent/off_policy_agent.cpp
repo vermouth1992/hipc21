@@ -3,9 +3,8 @@
 //
 
 #include "off_policy_agent.h"
-#include "utils/stop_watcher.h"
 
-void OffPolicyAgent::update_target(bool soft) {
+void OffPolicyAgent::update_target_q(bool soft) {
     if (soft) {
         soft_update(*target_q_network.ptr(), *q_network.ptr(), tau);
     } else {
@@ -15,12 +14,6 @@ void OffPolicyAgent::update_target(bool soft) {
 
 void OffPolicyAgent::set_logger(const std::shared_ptr<EpochLogger> &logger) {
     this->m_logger = logger;
-}
-
-torch::Tensor OffPolicyAgent::act_single(const torch::Tensor &obs, bool exploration) {
-    auto obs_batch = obs.unsqueeze(0);
-    auto act_batch = this->act_batch(obs_batch, exploration);
-    return act_batch.index({0});
 }
 
 OffPolicyAgent::OffPolicyAgent(float tau, float q_lr, float gamma) : tau(tau), q_lr(q_lr), gamma(gamma) {
@@ -67,6 +60,7 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
     // main training loop
     Gym::State s;
     env->reset(&s);
+    MSG("Current Obs shape" << s.observation.sizes());
     int64_t total_steps = 0;
     float episode_rewards = 0.;
     float episode_length = 0;
@@ -91,6 +85,7 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
             if (total_steps < start_steps) {
                 action = action_space->sample();
             } else {
+                MSG("Current Obs shape" << s.observation.sizes());
                 action = agent->act_single(current_obs.to(device), true).to(cpu);
             }
 
@@ -123,6 +118,7 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
                               });
 
                 env->reset(&s);
+                MSG("Current Obs shape" << s.observation.sizes());
                 episode_rewards = 0.;
                 episode_length = 0;
             }
@@ -141,10 +137,8 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
                                           data["next_obs"].to(device),
                                           data["rew"].to(device),
                                           data["done"].to(device),
-                                          std::nullopt);
-                        if (i % policy_delay == 0) {
-                            agent->update_target(true);
-                        }
+                                          std::nullopt,
+                                          i % policy_delay == 0);
                     }
                 }
 

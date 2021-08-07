@@ -2,8 +2,8 @@
 // Created by Chi Zhang on 8/5/21.
 //
 
-#ifndef HIPC21_FUNCTIONAL_H
-#define HIPC21_FUNCTIONAL_H
+#ifndef HIPC21_NN_FUNCTIONAL_H
+#define HIPC21_NN_FUNCTIONAL_H
 
 #include <torch/torch.h>
 #include "layers.h"
@@ -15,5 +15,7 @@ StackSequential build_mlp(int64_t input_dim, int64_t output_dim, int64_t mlp_hid
                           std::optional<float> dropout = std::nullopt
 );
 
+std::vector<float> convert_tensor_to_flat_vector(const torch::Tensor &tensor);
 
-#endif //HIPC21_FUNCTIONAL_H
+
+#endif //HIPC21_NN_FUNCTIONAL_H

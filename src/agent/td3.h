@@ -5,6 +5,8 @@
 #ifndef HIPC21_TD3_H
 #define HIPC21_TD3_H
 
+#include "nn/functional.h"
+#include "nn/layers.h"
 #include "off_policy_agent.h"
 #include "gym/gym.h"
 #include "common.h"
@@ -24,35 +26,36 @@ public:
                       float actor_noise = 0.1,
                       float target_noise = 0.2,
                       float noise_clip = 0.5
-    ) : actor_noise(actor_noise),
-        target_noise(target_noise),
-        noise_clip(noise_clip) {
+    );
 
-        M_Assert(act_space.type == Gym::Space::BOX, "Only support continuous action space");
-        if (act_space.box_shape.size() == 1 && obs_space.box_shape.size() == 1) {
-            int64_t obs_dim = obs_space.box_shape[0];
-            int64_t act_dim = act_space.box_shape[0];
-            this->q_network = std::make_shared<Mlp>(obs_dim, act_dim, q_mlp_hidden);
-            this->target_q_network = std::make_shared<Mlp>(obs_dim, act_dim, q_mlp_hidden);
-            this->q_optimizer = std::make_unique<torch::optim::Adam>(q_network.ptr()->parameters(),
-                                                                     torch::optim::AdamOptions(this->q_lr));
-        }
+    void update_target_policy(bool soft);
 
-        this->tau = tau;
-        this->gamma = gamma;
-        this->q_lr = q_lr;
+    void log_tabular() override;
 
+    str_to_tensor train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                             const torch::Tensor &rew, const torch::Tensor &done,
+                             const std::optional<torch::Tensor> &importance_weights, bool update_target) override;
 
-        register_module("q_network", q_network.ptr());
-        register_module("target_q_network", target_q_network.ptr());
-
-        update_target(false);
-    }
+    torch::Tensor act_single(const torch::Tensor &obs, bool exploration) override;
 
 private:
-    float actor_noise;
-    float target_noise;
-    float noise_clip;
+    const float actor_noise;
+    const float target_noise;
+    const float noise_clip;
+    const float act_lim;
+    torch::nn::AnyModule policy_net;
+    torch::nn::AnyModule target_policy_net;
+    std::unique_ptr<torch::optim::Optimizer> policy_optimizer;
+
+    torch::Tensor compute_target_q(const torch::Tensor &next_obs,
+                                   const torch::Tensor &rew,
+                                   const torch::Tensor &done);
+
+    void update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                      const torch::Tensor &rew, const torch::Tensor &done);
+
+    void update_actor(const torch::Tensor &obs);
+
 };
 
 

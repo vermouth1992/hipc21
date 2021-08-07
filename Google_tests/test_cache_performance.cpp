@@ -3,7 +3,7 @@
 //
 
 #include "gtest/gtest.h"
-#include "functional.h"
+#include "utils/rl_functional.h"
 
 #define RAW
 

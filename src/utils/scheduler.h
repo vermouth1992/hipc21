@@ -16,7 +16,7 @@ class ConstantScheduler : public Scheduler {
 public:
     explicit ConstantScheduler(double value);
 
-    double value(__attribute__((unused)) int64_t t) override;
+    double value(int64_t t) override;
 
 private:
     double m_value;

@@ -9,5 +9,6 @@
 #include "linear.h"
 #include "squeeze.h"
 #include "stack_sequential.h"
+#include "value_net.h"
 
 #endif //HIPC21_LAYERS_H

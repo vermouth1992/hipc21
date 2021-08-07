@@ -7,11 +7,11 @@
 
 #include "off_policy_agent.h"
 
-class SACAgent : public OffPolicyAgent {
-    explicit SACAgent(int64_t obs_dim, int64_t act_dim) {
-        
-    }
-};
+//class SACAgent : public OffPolicyAgent {
+//    explicit SACAgent(int64_t obs_dim, int64_t act_dim) {
+//
+//    }
+//};
 
 
 #endif //HIPC21_SAC_H

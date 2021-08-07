@@ -10,7 +10,8 @@
 #include "gym/gym.h"
 #include "logger.h"
 #include "replay_buffer/replay_buffer.h"
-#include "functional.h"
+#include "utils/rl_functional.h"
+#include "utils/stop_watcher.h"
 
 // define a template class for general off-policy agent
 class OffPolicyAgent : public torch::nn::Module {
@@ -19,7 +20,7 @@ public:
 
     explicit OffPolicyAgent(float tau, float q_lr, float gamma);
 
-    void update_target(bool soft);
+    void update_target_q(bool soft);
 
     void set_logger(const std::shared_ptr<EpochLogger> &logger);
 
@@ -30,11 +31,10 @@ public:
                                      const torch::Tensor &next_obs,
                                      const torch::Tensor &rew,
                                      const torch::Tensor &done,
-                                     const std::optional<torch::Tensor> &importance_weights) = 0;
+                                     const std::optional<torch::Tensor> &importance_weights,
+                                     bool update_target) = 0;
 
-    virtual torch::Tensor act_batch(const torch::Tensor &obs, bool exploration) = 0;
-
-    virtual torch::Tensor act_single(const torch::Tensor &obs, bool exploration);
+    virtual torch::Tensor act_single(const torch::Tensor &obs, bool exploration) = 0;
 
 protected:
     torch::nn::AnyModule q_network;
@@ -42,7 +42,7 @@ protected:
     float tau{};
     float q_lr{};
     float gamma{};
-    std::unique_ptr<torch::optim::Adam> q_optimizer;
+    std::unique_ptr<torch::optim::Optimizer> q_optimizer;
     std::shared_ptr<EpochLogger> m_logger;
 };
 

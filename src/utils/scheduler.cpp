@@ -2,13 +2,14 @@
 // Created by Chi Zhang on 8/5/21.
 //
 
+#include <algorithm>
 #include "scheduler.h"
 
 ConstantScheduler::ConstantScheduler(double value) : m_value(value) {
 
 }
 
-double ConstantScheduler::value(int64_t t) {
+double ConstantScheduler::value(__attribute__((unused)) int64_t t) {
     return m_value;
 }
 

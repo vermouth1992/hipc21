@@ -7,7 +7,7 @@
 
 #include <torch/torch.h>
 #include <vector>
-#include "functional.h"
+#include "utils/rl_functional.h"
 
 class SegmentTreeTorch {
 public:

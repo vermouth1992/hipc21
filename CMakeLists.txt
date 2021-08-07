@@ -35,8 +35,20 @@ set(SOURCE_FILES
         src/agent/dqn.cpp
         main.cpp
         src/replay_buffer/SumTree.cpp
-        src/agent/sac.cpp src/agent/dqn.cpp
-        src/agent/td3.cpp src/nn/linear.cpp src/nn/linear.h src/utils/scheduler.cpp src/utils/scheduler.h src/nn/functional.cpp src/nn/functional.h src/nn/activation.cpp src/nn/activation.h src/nn/layers.h src/nn/squeeze.cpp src/nn/squeeze.h src/utils/stop_watcher.cpp src/utils/stop_watcher.h src/agent/off_policy_agent.cpp src/nn/value_net.cpp src/nn/value_net.h src/nn/stack_sequential.cpp src/nn/stack_sequential.h)
+        src/agent/sac.cpp
+        src/agent/dqn.cpp
+        src/agent/td3.cpp
+        src/nn/linear.cpp
+        src/utils/scheduler.cpp
+        src/nn/functional.cpp
+        src/nn/activation.cpp
+        src/nn/squeeze.cpp
+        src/utils/stop_watcher.cpp
+        src/agent/off_policy_agent.cpp
+        src/nn/value_net.cpp
+        src/nn/stack_sequential.cpp
+        src/utils/rl_functional.cpp
+        src/utils/torch_utils.cpp)
 
 add_executable(hipc21 ${SOURCE_FILES})
 

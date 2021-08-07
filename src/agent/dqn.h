@@ -7,31 +7,34 @@
 
 #include <torch/torch.h>
 #include <utility>
-#include "functional.h"
 #include "gym/gym.h"
 #include "replay_buffer/replay_buffer.h"
 #include "common.h"
 #include "agent/off_policy_agent.h"
-
-
-
-static inline std::vector<float> tensor_to_vector(const torch::Tensor &tensor) {
-    torch::Tensor t = torch::flatten(tensor);
-    return {t.data_ptr<float>(), t.data_ptr<float>() + t.numel()};
-}
+#include "utils/rl_functional.h"
+#include "utils/torch_utils.h"
+#include "nn/functional.h"
+#include "cxxopts.hpp"
+#include "fmt/ranges.h"
 
 class DQN : public OffPolicyAgent {
 public:
     explicit DQN(const Gym::Space &obs_space,
                  const Gym::Space &act_space,
-                 int64_t mlp_hidden, float q_lr, float gamma, float tau, bool double_q, float epsilon_greedy);
+                 int64_t mlp_hidden = 128,
+                 float q_lr = 1e-3,
+                 float gamma = 0.99,
+                 float tau = 5e-3,
+                 bool double_q = true,
+                 float epsilon_greedy = 0.1);
 
     str_to_tensor train_step(const torch::Tensor &obs,
                              const torch::Tensor &act,
                              const torch::Tensor &next_obs,
                              const torch::Tensor &rew,
                              const torch::Tensor &done,
-                             const std::optional<torch::Tensor> &importance_weights) override;
+                             const std::optional<torch::Tensor> &importance_weights,
+                             bool update_target) override;
 
 
     torch::Tensor act_single(const torch::Tensor &obs, bool exploration) override;
@@ -40,15 +43,12 @@ public:
 
     void log_tabular() override;
 
-    torch::Tensor act_batch(const torch::Tensor &obs, bool exploration) override;
-
 protected:
     int64_t m_act_dim;
     bool m_double_q;
     float m_epsilon_greedy;
 };
 
-int dqn_main(int argc, char **argv);
 
 
 //struct ActorParam {
@@ -261,7 +261,7 @@ int dqn_main(int argc, char **argv);
 //                                          data["rew"].to(device),
 //                                          data["done"].to(device),
 //                                          weights->to(device));
-//            agent->update_target(true);
+//            agent->update_target_q(true);
 //            // update priority
 //            pthread_mutex_lock(buffer_mutex.get());
 //            // TODO: the idx may be override by the newly added items

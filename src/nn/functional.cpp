@@ -2,8 +2,7 @@
 // Created by Chi Zhang on 8/5/21.
 //
 
-#include "functional.h"
-#include "layers.h"
+#include "nn/functional.h"
 
 
 StackSequential
@@ -64,4 +63,9 @@ build_mlp(int64_t input_dim, int64_t output_dim, int64_t mlp_hidden, int64_t num
     }
 
     return model;
+}
+
+std::vector<float> convert_tensor_to_flat_vector(const torch::Tensor &tensor) {
+    torch::Tensor t = torch::flatten(tensor);
+    return {t.data_ptr<float>(), t.data_ptr<float>() + t.numel()};
 }

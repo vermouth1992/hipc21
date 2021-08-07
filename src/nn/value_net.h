@@ -10,6 +10,8 @@
 
 class EnsembleMinQNet : public torch::nn::Module {
 public:
+    const int64_t num_ensembles;
+
     explicit EnsembleMinQNet(int64_t obs_dim, int64_t act_dim, int64_t mlp_hidden, int64_t num_ensembles = 2,
                              int64_t num_layers = 3);
 
@@ -17,7 +19,6 @@ public:
 
 private:
     torch::nn::AnyModule model;
-    int64_t num_ensembles;
 };
 
 
