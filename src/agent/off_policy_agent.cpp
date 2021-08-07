@@ -60,7 +60,6 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
     // main training loop
     Gym::State s;
     env->reset(&s);
-    MSG("Current Obs shape" << s.observation.sizes());
     int64_t total_steps = 0;
     float episode_rewards = 0.;
     float episode_length = 0;
@@ -85,7 +84,6 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
             if (total_steps < start_steps) {
                 action = action_space->sample();
             } else {
-                MSG("Current Obs shape" << s.observation.sizes());
                 action = agent->act_single(current_obs.to(device), true).to(cpu);
             }
 
@@ -118,7 +116,6 @@ void off_policy_trainer(const std::shared_ptr<Gym::Environment> &env, const std:
                               });
 
                 env->reset(&s);
-                MSG("Current Obs shape" << s.observation.sizes());
                 episode_rewards = 0.;
                 episode_length = 0;
             }

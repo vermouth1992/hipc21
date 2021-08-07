@@ -82,7 +82,6 @@ torch::Tensor TD3Agent::act_single(const torch::Tensor &obs, bool exploration) {
         auto noise = torch::randn_like(pi_final) * this->actor_noise;
         pi_final = pi_final + noise;
         pi_final = torch::clip(pi_final, -this->act_lim, this->act_lim);
-        std::cout << pi_final.sizes() << std::endl;
     }
     return pi_final;
 }

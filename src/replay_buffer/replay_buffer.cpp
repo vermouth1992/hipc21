@@ -74,7 +74,7 @@ void ReplayBuffer::add_single(const str_to_tensor &data) {
     // add batch dimension
     str_to_tensor batch_data;
     for (auto &it: data) {
-        batch_data[it.first] = it.second.unsqueeze_(0);
+        batch_data[it.first] = it.second.unsqueeze(0);
     }
     this->add_batch(batch_data);
 }
