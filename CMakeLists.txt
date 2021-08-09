@@ -49,7 +49,9 @@ set(SOURCE_FILES
         src/nn/stack_sequential.cpp
         src/utils/rl_functional.cpp
         src/utils/torch_utils.cpp
-        src/trainer/off_policy_trainer.cpp)
+        src/trainer/off_policy_trainer.cpp
+        src/trainer/off_policy_trainer_parallel.cpp
+        )
 
 add_executable(hipc21 ${SOURCE_FILES})
 

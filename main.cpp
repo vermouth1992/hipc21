@@ -50,6 +50,25 @@ static cxxopts::ParseResult parse(int argc, char *argv[]) {
     }
 }
 
+std::shared_ptr<OffPolicyAgent> create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+                                             const std::string &algorithm) {
+    auto env = env_fn();
+    std::shared_ptr<OffPolicyAgent> agent;
+    if (algorithm == "dqn") {
+        agent = std::make_shared<DQN>(*env->observation_space(),
+                                      *env->action_space());
+    } else if (algorithm == "td3") {
+        agent = std::make_shared<TD3Agent>(*env->observation_space(),
+                                           *env->action_space());
+    } else if (algorithm == "sac") {
+
+    } else {
+        throw std::runtime_error(fmt::format("Unknown algorithm {}", algorithm));
+    }
+    env->close();
+    return agent;
+}
+
 int main(int argc, char **argv) {
     // remove the second argv
     if (argc < 2) throw std::runtime_error("Must specify the algorithm");
@@ -66,28 +85,19 @@ int main(int argc, char **argv) {
         std::string device_name = result["device"].as<std::string>();
         auto device = get_torch_device(device_name);
         std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
-        const std::string env_id = result["env_id"].as<std::string>();
+        std::string env_id = result["env_id"].as<std::string>();
         std::shared_ptr<Gym::Environment> env = client->make(env_id);
-        std::shared_ptr<Gym::Environment> test_env = client->make(env_id);
-        // construct agent
-        std::shared_ptr<OffPolicyAgent> agent;
-        if (algorithm == "dqn") {
-            agent = std::make_shared<DQN>(*env->observation_space(),
-                                          *env->action_space());
-        } else if (algorithm == "td3") {
-            agent = std::make_shared<TD3Agent>(*env->observation_space(),
-                                               *env->action_space());
-        } else if (algorithm == "sac") {
 
-        } else {
-            throw std::runtime_error(fmt::format("Unknown algorithm {}", algorithm));
-        }
+        std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&client, &env_id]() {
+            return client->make(env_id);
+        };
 
-        agent->to(device);
+        std::function<std::shared_ptr<OffPolicyAgent>()> agent_fn = [&env_fn, &algorithm]() {
+            return create_agent(env_fn, algorithm);
+        };
 
-        OffPolicyTrainer trainer(env,
-                                 test_env,
-                                 agent,
+        OffPolicyTrainer trainer(env_fn,
+                                 agent_fn,
                                  result["epochs"].as<int64_t>(),
                                  result["steps_per_epoch"].as<int64_t>(),
                                  result["start_steps"].as<int64_t>(),
@@ -103,9 +113,6 @@ int main(int argc, char **argv) {
         trainer.setup_logger(std::nullopt, "data");
         trainer.setup_replay_buffer(result["replay_size"].as<int64_t>(), result["batch_size"].as<int64_t>());
         trainer.train();
-
-        env->close();
-        test_env->close();
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());
