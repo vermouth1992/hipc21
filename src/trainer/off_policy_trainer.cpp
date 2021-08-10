@@ -4,12 +4,14 @@
 
 #include "off_policy_trainer.h"
 
-OffPolicyTrainer::OffPolicyTrainer(std::function<std::shared_ptr<Gym::Environment>()> env_fn,
-                                   std::function<std::shared_ptr<OffPolicyAgent>()> agent_fn,
+OffPolicyTrainer::OffPolicyTrainer(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+                                   const std::function<std::shared_ptr<OffPolicyAgent>()> &agent_fn,
                                    int64_t epochs, int64_t steps_per_epoch,
                                    int64_t start_steps, int64_t update_after, int64_t update_every,
                                    int64_t update_per_step, int64_t policy_delay, int64_t num_test_episodes,
                                    torch::Device device, int64_t seed) :
+        env_fn(env_fn),
+        agent_fn(agent_fn),
         env(env_fn()),
         test_env(env_fn()),
         agent(agent_fn()),
@@ -31,37 +33,37 @@ void OffPolicyTrainer::setup_logger(std::optional<std::string> exp_name, const s
     if (exp_name == std::nullopt) {
         exp_name.emplace(env->env_id + "_" + std::string(typeid(*agent).name()));
     }
-    auto output_dir = setup_logger_kwargs(exp_name.value(), seed, data_dir);
-    logger = std::make_shared<EpochLogger>(output_dir, exp_name.value());
+    auto output_dir = rlu::setup_logger_kwargs(exp_name.value(), seed, data_dir);
+    logger = std::make_shared<rlu::EpochLogger>(output_dir, exp_name.value());
     agent->set_logger(logger);
 }
 
 void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
-    std::unique_ptr<DataSpec> action_data_spec;
+    std::unique_ptr<rlu::replay_buffer::DataSpec> action_data_spec;
     auto action_space = env->action_space();
     auto observation_space = env->observation_space();
     if (action_space->type == action_space->DISCRETE) {
-        action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
+        action_data_spec = std::make_unique<rlu::replay_buffer::DataSpec>(std::vector<int64_t>(), torch::kInt64);
     } else {
-        action_data_spec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
+        action_data_spec = std::make_unique<rlu::replay_buffer::DataSpec>(action_space->box_shape, torch::kFloat32);
     }
     // setup agent
     agent->to(device);
     // setup replay buffer
-    ReplayBuffer::str_to_dataspec data_spec{
-            {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
+    rlu::replay_buffer::ReplayBuffer::str_to_dataspec data_spec{
+            {"obs",      rlu::replay_buffer::DataSpec(observation_space->box_shape, torch::kFloat32)},
             {"act",      *action_data_spec},
-            {"next_obs", DataSpec(observation_space->box_shape, torch::kFloat32)},
-            {"rew",      DataSpec({}, torch::kFloat32)},
-            {"done",     DataSpec({}, torch::kFloat32)},
+            {"next_obs", rlu::replay_buffer::DataSpec(observation_space->box_shape, torch::kFloat32)},
+            {"rew",      rlu::replay_buffer::DataSpec({}, torch::kFloat32)},
+            {"done",     rlu::replay_buffer::DataSpec({}, torch::kFloat32)},
     };
 
-    this->buffer = std::make_shared<UniformReplayBuffer>(replay_size, data_spec, batch_size);
+    this->buffer = std::make_shared<rlu::replay_buffer::UniformReplayBuffer>(replay_size, data_spec, batch_size);
 }
 
 void OffPolicyTrainer::train() {
     torch::manual_seed(seed);
-    StopWatcher watcher;
+    rlu::watcher::StopWatcher watcher;
     watcher.start();
     env->reset(&s);
 

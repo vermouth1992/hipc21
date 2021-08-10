@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         auto result = parse(argc - 1, real_argv);
         // device name
         std::string device_name = result["device"].as<std::string>();
-        auto device = get_torch_device(device_name);
+        auto device = rlu::ptu::get_torch_device(device_name);
         std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
         std::string env_id = result["env_id"].as<std::string>();
         std::shared_ptr<Gym::Environment> env = client->make(env_id);

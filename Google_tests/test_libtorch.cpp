@@ -57,10 +57,3 @@ TEST(Libtorch, cpp_to_python) {
     out << result;
     out.close();
 }
-
-TEST(Libtorch, sequential) {
-    auto model = build_mlp();
-    auto tensor = torch::randn({100, 10});
-    auto output = model->forward(tensor);
-    std::cout << output.sizes() << std::endl;
-}

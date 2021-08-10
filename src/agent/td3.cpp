@@ -17,18 +17,19 @@ TD3Agent::TD3Agent(const Gym::Space &obs_space, const Gym::Space &act_space, int
         int64_t obs_dim = obs_space.box_shape[0];
         int64_t act_dim = act_space.box_shape[0];
         this->q_network = register_module("q_network",
-                                          std::make_shared<EnsembleMinQNet>(obs_dim, act_dim, q_mlp_hidden));
+                                          std::make_shared<rlu::nn::EnsembleMinQNet>(obs_dim, act_dim, q_mlp_hidden));
         this->target_q_network = register_module("target_q_network",
-                                                 std::make_shared<EnsembleMinQNet>(obs_dim, act_dim, q_mlp_hidden));
+                                                 std::make_shared<rlu::nn::EnsembleMinQNet>(obs_dim, act_dim,
+                                                                                            q_mlp_hidden));
         this->q_optimizer = std::make_unique<torch::optim::Adam>(q_network.ptr()->parameters(),
                                                                  torch::optim::AdamOptions(q_lr));
-        this->policy_net = register_module("policy_network", build_mlp(obs_dim, act_dim,
-                                                                       policy_mlp_hidden, 3, "relu", false,
-                                                                       "tanh"));
+        this->policy_net = register_module("policy_network", rlu::nn::build_mlp(obs_dim, act_dim,
+                                                                                policy_mlp_hidden, 3, "relu", false,
+                                                                                "tanh"));
         this->target_policy_net = register_module("target_policy_network",
-                                                  build_mlp(obs_dim, act_dim,
-                                                            policy_mlp_hidden, 3, "relu", false,
-                                                            "tanh"));
+                                                  rlu::nn::build_mlp(obs_dim, act_dim,
+                                                                     policy_mlp_hidden, 3, "relu", false,
+                                                                     "tanh"));
         this->policy_optimizer = std::make_unique<torch::optim::Adam>(policy_net.ptr()->parameters(),
                                                                       torch::optim::AdamOptions(policy_lr));
 
@@ -46,9 +47,9 @@ TD3Agent::TD3Agent(const Gym::Space &obs_space, const Gym::Space &act_space, int
 
 void TD3Agent::update_target_policy(bool soft) {
     if (soft) {
-        soft_update(*target_policy_net.ptr(), *policy_net.ptr(), tau);
+        rlu::functional::soft_update(*target_policy_net.ptr(), *policy_net.ptr(), tau);
     } else {
-        hard_update(*target_policy_net.ptr(), *policy_net.ptr());
+        rlu::functional::hard_update(*target_policy_net.ptr(), *policy_net.ptr());
     }
 }
 
@@ -112,7 +113,8 @@ void TD3Agent::update_q_net(const torch::Tensor &obs, const torch::Tensor &act, 
     q_values_loss.backward();
     q_optimizer->step();
     for (int i = 0; i < 2; i++) {
-        m_logger->store(fmt::format("Q{}Vals", i + 1), convert_tensor_to_flat_vector(q_values.index({0}).detach()));
+        m_logger->store(fmt::format("Q{}Vals", i + 1),
+                        rlu::nn::convert_tensor_to_flat_vector(q_values.index({0}).detach()));
     }
     m_logger->store("LossQ", q_values_loss.item<float>());
 }

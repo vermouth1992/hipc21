@@ -22,33 +22,23 @@ set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
 
-include_directories("src" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
+include_directories("libs/include" "src" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
 link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
+add_subdirectory(third_party/pybind11)
 add_subdirectory(Google_tests)
+add_subdirectory(libs)
+add_subdirectory(binding)
 
 set(SOURCE_FILES
         envs/binding-cpp/gym_binding.cpp
-        src/replay_buffer/replay_buffer.cpp
-        src/replay_buffer/segment_tree.cpp
         src/agent/dqn.cpp
         main.cpp
-        src/replay_buffer/SumTree.cpp
         src/agent/sac.cpp
         src/agent/dqn.cpp
         src/agent/td3.cpp
-        src/nn/linear.cpp
-        src/utils/scheduler.cpp
-        src/nn/functional.cpp
-        src/nn/activation.cpp
-        src/nn/squeeze.cpp
-        src/utils/stop_watcher.cpp
         src/agent/off_policy_agent.cpp
-        src/nn/value_net.cpp
-        src/nn/stack_sequential.cpp
-        src/utils/rl_functional.cpp
-        src/utils/torch_utils.cpp
         src/trainer/off_policy_trainer.cpp
         src/trainer/off_policy_trainer_parallel.cpp
         )
@@ -56,10 +46,5 @@ set(SOURCE_FILES
 add_executable(hipc21 ${SOURCE_FILES})
 
 find_package(fmt)
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" curl fmt::fmt ${PYTHON_LIBRARIES})
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" curl fmt::fmt ${PYTHON_LIBRARIES} rlu)
 
-add_library(lib STATIC src/replay_buffer/SumTree.cpp src/replay_buffer/SumTree.h)
-
-add_subdirectory(third_party/pybind11)
-pybind11_add_module(sumtree pybinding.cpp)
-target_link_libraries(sumtree PRIVATE lib)

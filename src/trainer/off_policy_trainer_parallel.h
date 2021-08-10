@@ -11,7 +11,7 @@
 #include <vector>
 
 class OffPolicyTrainerParallel : public OffPolicyTrainer {
-
+    using OffPolicyTrainer::OffPolicyTrainer;
 
 public:
     void train() override {
@@ -46,6 +46,9 @@ protected:
 
             pthread_mutex_lock(&global_steps_mutex);
             global_steps_temp = total_steps;
+            // create a new thread for testing and logging
+            current_global_steps = global_steps_temp;
+            this->start_tester_thread();
             // determine whether to break
             if (global_steps_temp >= max_global_steps) {
                 pthread_mutex_unlock(&global_steps_mutex);
@@ -85,6 +88,18 @@ protected:
 
     }
 
+    virtual void tester_fn_internal() {
+        // copy the weights from learner
+
+    }
+
+    void start_tester_thread() {
+        int ret = pthread_create(&tester_thread, nullptr, &tester_fn, this);
+        if (ret != 0) {
+            MSG("Fail to create tester thread with error code " << ret);
+        }
+    }
+
     void start_actor_threads() {
         int ret;
         for (auto &thread : actor_threads) {
@@ -118,14 +133,21 @@ private:
         return nullptr;
     }
 
+    static void *tester_fn(void *This) {
+        ((OffPolicyTrainerParallel *) This)->tester_fn_internal();
+        return nullptr;
+    }
+
     // threads
     std::vector<pthread_t> actor_threads;
     std::vector<pthread_t> learner_threads;
+    pthread_t tester_thread;
     // environments
     std::vector<std::shared_ptr<Gym::Environment>> envs;
     // mutexes
     pthread_mutex_t global_steps_mutex;
-
+    // others
+    int64_t current_global_steps;
 
 };
 

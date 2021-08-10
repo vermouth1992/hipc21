@@ -6,13 +6,13 @@
 
 void OffPolicyAgent::update_target_q(bool soft) {
     if (soft) {
-        soft_update(*target_q_network.ptr(), *q_network.ptr(), tau);
+        rlu::functional::soft_update(*target_q_network.ptr(), *q_network.ptr(), tau);
     } else {
-        hard_update(*target_q_network.ptr(), *q_network.ptr());
+        rlu::functional::hard_update(*target_q_network.ptr(), *q_network.ptr());
     }
 }
 
-void OffPolicyAgent::set_logger(const std::shared_ptr<EpochLogger> &logger) {
+void OffPolicyAgent::set_logger(const std::shared_ptr<rlu::EpochLogger> &logger) {
     this->m_logger = logger;
 }
 

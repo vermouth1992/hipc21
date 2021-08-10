@@ -17,8 +17,8 @@
 
 class OffPolicyTrainer {
 public:
-    explicit OffPolicyTrainer(std::function<std::shared_ptr<Gym::Environment>()> env_fn,
-                              std::function<std::shared_ptr<OffPolicyAgent>()> agent_fn,
+    explicit OffPolicyTrainer(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+                              const std::function<std::shared_ptr<OffPolicyAgent>()> &agent_fn,
                               int64_t epochs,
                               int64_t steps_per_epoch,
                               int64_t start_steps,
@@ -37,10 +37,12 @@ public:
     virtual void train();
 
 protected:
-    std::shared_ptr<ReplayBuffer> buffer;
+    const std::function<std::shared_ptr<Gym::Environment>()> env_fn;
+    const std::function<std::shared_ptr<OffPolicyAgent>()> agent_fn;
+    std::shared_ptr<rlu::replay_buffer::ReplayBuffer> buffer;
     const std::shared_ptr<Gym::Environment> env;
     const std::shared_ptr<Gym::Environment> test_env;
-    std::shared_ptr<EpochLogger> logger;
+    std::shared_ptr<rlu::EpochLogger> logger;
     const std::shared_ptr<OffPolicyAgent> agent;
     const int64_t epochs;
     const int64_t steps_per_epoch;

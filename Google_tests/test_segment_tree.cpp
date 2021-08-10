@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "replay_buffer/segment_tree.h"
 #include "utils/rl_functional.h"
+#include "utils/stop_watcher.h"
 
 TEST(SegmentTree, speed) {
     StopWatcher origin;

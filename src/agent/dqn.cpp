@@ -17,8 +17,8 @@ DQN::DQN(const Gym::Space &obs_space,
     if (obs_space.box_shape.size() == 1) {
         int64_t obs_dim = obs_space.box_shape[0];
         int64_t act_dim = act_space.discreet_n;
-        this->q_network = register_module("q_network", build_mlp(obs_dim, act_dim, mlp_hidden));
-        this->target_q_network = register_module("target_q_network", build_mlp(obs_dim, act_dim, mlp_hidden));
+        this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
+        this->target_q_network = register_module("target_q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
     } else {
         throw std::runtime_error("Unsupported observation space.");
     }
@@ -67,7 +67,7 @@ DQN::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch:
     };
 
     // logging
-    m_logger->store("QVals", convert_tensor_to_flat_vector(q_values));
+    m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector(q_values));
     m_logger->store("LossQ", loss.item<float>());
 
     return log_data;

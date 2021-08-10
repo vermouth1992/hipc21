@@ -13,5 +13,6 @@ find_package(fmt)
 add_executable(Google_Tests_run
         test_segment_tree.cpp test_libtorch.cpp test_share_ptr.cpp
         test_cache_performance.cpp test_cpu.cpp test_print.cpp test_python.cpp test_env.cpp
-        ../envs/binding-cpp/gym_binding.cpp)
+        ../envs/binding-cpp/gym_binding.cpp test_pthread.cpp
+        ../libs/src/stop_watcher.cpp)
 target_link_libraries(Google_Tests_run gtest gtest_main "${TORCH_LIBRARIES}" fmt::fmt curl ${PYTHON_LIBRARIES})

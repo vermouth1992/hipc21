@@ -22,7 +22,7 @@ public:
 
     void update_target_q(bool soft);
 
-    void set_logger(const std::shared_ptr<EpochLogger> &logger);
+    void set_logger(const std::shared_ptr<rlu::EpochLogger> &logger);
 
     virtual void log_tabular() = 0;
 
@@ -43,7 +43,7 @@ protected:
     float q_lr{};
     float gamma{};
     std::unique_ptr<torch::optim::Optimizer> q_optimizer;
-    std::shared_ptr<EpochLogger> m_logger;
+    std::shared_ptr<rlu::EpochLogger> m_logger;
 };
 
 

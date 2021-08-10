@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 #include "utils/rl_functional.h"
+#include "utils/stop_watcher.h"
 
 #define RAW
 
