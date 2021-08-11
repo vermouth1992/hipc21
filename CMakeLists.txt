@@ -9,8 +9,7 @@ else ()
     set(CONDA_PATH $ENV{HOME}/miniconda3)
 endif (APPLE)
 
-find_package(PythonInterp REQUIRED)
-find_package(PythonLibs REQUIRED)
+find_package(Python COMPONENTS Interpreter Development)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 message(STATUS "Found Python site-package library at ${Python_SITELIB}")
@@ -26,7 +25,7 @@ include_directories("libs/include" "src" "${LIBTORCH}/include" "envs/binding-cpp
 link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
-add_subdirectory(third_party/pybind11)
+find_package(pybind11)
 add_subdirectory(Google_tests)
 add_subdirectory(libs)
 add_subdirectory(binding)

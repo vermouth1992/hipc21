@@ -9,7 +9,7 @@ namespace py = pybind11;
 
 template<typename T>
 void declare_array(py::module &m, const std::string &typestr) {
-    using Class = rlu::replay_buffer::SumTree<T>;
+    using Class = SumTree<T>;
     std::string pyclass_name = std::string("SumTree") + typestr;
     py::class_<Class>(m, pyclass_name.c_str())
             .def(py::init<int64_t, int64_t>())
@@ -19,6 +19,6 @@ void declare_array(py::module &m, const std::string &typestr) {
 }
 
 // Python binding
-PYBIND11_MODULE(example, m) {
+PYBIND11_MODULE(sumtree, m) {
     declare_array<float>(m, "float");
 }
