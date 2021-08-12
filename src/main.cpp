@@ -50,16 +50,17 @@ static cxxopts::ParseResult parse(int argc, char *argv[]) {
     }
 }
 
-std::shared_ptr<OffPolicyAgent> create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
-                                             const std::string &algorithm) {
+std::shared_ptr<rlu::agent::OffPolicyAgent>
+create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+             const std::string &algorithm) {
     auto env = env_fn();
-    std::shared_ptr<OffPolicyAgent> agent;
+    std::shared_ptr<rlu::agent::OffPolicyAgent> agent;
     if (algorithm == "dqn") {
-        agent = std::make_shared<DQN>(*env->observation_space(),
-                                      *env->action_space());
+        agent = std::make_shared<rlu::agent::DQN>(*env->observation_space(),
+                                                  *env->action_space());
     } else if (algorithm == "td3") {
-        agent = std::make_shared<TD3Agent>(*env->observation_space(),
-                                           *env->action_space());
+        agent = std::make_shared<rlu::agent::TD3Agent>(*env->observation_space(),
+                                                       *env->action_space());
     } else if (algorithm == "sac") {
 
     } else {
@@ -92,22 +93,22 @@ int main(int argc, char **argv) {
             return client->make(env_id);
         };
 
-        std::function<std::shared_ptr<OffPolicyAgent>()> agent_fn = [&env_fn, &algorithm]() {
+        std::function<std::shared_ptr<rlu::agent::OffPolicyAgent>()> agent_fn = [&env_fn, &algorithm]() {
             return create_agent(env_fn, algorithm);
         };
 
-        OffPolicyTrainer trainer(env_fn,
-                                 agent_fn,
-                                 result["epochs"].as<int64_t>(),
-                                 result["steps_per_epoch"].as<int64_t>(),
-                                 result["start_steps"].as<int64_t>(),
-                                 result["update_after"].as<int64_t>(),
-                                 result["update_every"].as<int64_t>(),
-                                 result["update_per_step"].as<int64_t>(),
-                                 result["policy_delay"].as<int64_t>(),
-                                 result["num_test_episodes"].as<int64_t>(),
-                                 device,
-                                 result["seed"].as<int64_t>()
+        rlu::trainer::OffPolicyTrainer trainer(env_fn,
+                                               agent_fn,
+                                               result["epochs"].as<int64_t>(),
+                                               result["steps_per_epoch"].as<int64_t>(),
+                                               result["start_steps"].as<int64_t>(),
+                                               result["update_after"].as<int64_t>(),
+                                               result["update_every"].as<int64_t>(),
+                                               result["update_per_step"].as<int64_t>(),
+                                               result["policy_delay"].as<int64_t>(),
+                                               result["num_test_episodes"].as<int64_t>(),
+                                               device,
+                                               result["seed"].as<int64_t>()
         );
 
         trainer.setup_logger(std::nullopt, "data");
