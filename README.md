@@ -6,4 +6,5 @@
 ```bash
 conda install fmt
 conda install -c conda-forge nlohmann_json
+conda install -c conda-forge spdlog
 ```

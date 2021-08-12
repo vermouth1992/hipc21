@@ -69,7 +69,7 @@ namespace rlu::agent {
     TD3Agent::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
                          const torch::Tensor &rew, const torch::Tensor &done,
                          const std::optional<torch::Tensor> &importance_weights, bool update_target) {
-        this->update_q_net(obs, act, next_obs, rew, done);
+        this->update_q_net(obs, act, next_obs, rew, done, importance_weights);
         if (update_target) {
             this->update_actor(obs);
             this->update_target_q(true);
@@ -106,13 +106,17 @@ namespace rlu::agent {
     }
 
     void TD3Agent::update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                                const torch::Tensor &rew, const torch::Tensor &done) {
+                                const torch::Tensor &rew, const torch::Tensor &done,
+                                const std::optional<torch::Tensor> &importance_weights) {
         auto q_target = this->compute_target_q(next_obs, rew, done);
         q_optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs, act, false); // (num_ensemble, None)
         auto q_values_loss = 0.5 * torch::square(torch::unsqueeze(q_target, 0) - q_values);
         q_values_loss = torch::sum(q_values_loss, 0);  // (None,)
         // apply importance weights
+        if (importance_weights != std::nullopt) {
+            q_values_loss = q_values_loss * importance_weights.value();
+        }
         q_values_loss = torch::mean(q_values_loss);
         q_values_loss.backward();
         q_optimizer->step();

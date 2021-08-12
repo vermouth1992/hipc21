@@ -53,7 +53,8 @@ namespace rlu::agent {
                                        const torch::Tensor &done);
 
         void update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                          const torch::Tensor &rew, const torch::Tensor &done);
+                          const torch::Tensor &rew, const torch::Tensor &done,
+                          const std::optional<torch::Tensor> &importance_weights);
 
         void update_actor(const torch::Tensor &obs);
 

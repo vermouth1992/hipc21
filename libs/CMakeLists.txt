@@ -20,7 +20,7 @@ set(LIBSOURCE
         src/td3.cpp
         src/off_policy_agent.cpp
         src/off_policy_trainer.cpp
-        src/off_policy_trainer_parallel.cpp)
+        src/off_policy_trainer_parallel.cpp src/logger.cpp)
 
 add_library(rlu ${LIBSOURCE})
 target_link_libraries(rlu "${TORCH_LIBRARIES}")
