@@ -9,6 +9,7 @@
 #include <torch/torch.h>
 #include <utility>
 #include <vector>
+#include "fmt/format.h"
 #include "segment_tree.h"
 
 using namespace torch::indexing;
@@ -32,9 +33,9 @@ namespace rlu::replay_buffer {
         explicit ReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec, int64_t batch_size);
 
         // pure virtual function
-        [[nodiscard]] virtual std::shared_ptr<torch::Tensor> generate_idx() const = 0;
+        [[nodiscard]] virtual torch::Tensor generate_idx() const = 0;
 
-        std::unique_ptr<str_to_tensor> sample();
+        str_to_tensor sample();
 
         void reset();
 
@@ -42,9 +43,9 @@ namespace rlu::replay_buffer {
 
         [[nodiscard]] int64_t capacity() const;
 
-        std::unique_ptr<str_to_tensor> operator[](const torch::Tensor &idx);
+        str_to_tensor operator[](const torch::Tensor &idx);
 
-        std::unique_ptr<str_to_tensor> get();
+        str_to_tensor get();
 
         virtual void add_batch(const str_to_tensor &data);
 
@@ -64,7 +65,7 @@ namespace rlu::replay_buffer {
         explicit UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
                                      int64_t batch_size);
 
-        [[nodiscard]] std::shared_ptr<torch::Tensor> generate_idx() const override;
+        [[nodiscard]] torch::Tensor generate_idx() const override;
 
 
     };
@@ -73,18 +74,18 @@ namespace rlu::replay_buffer {
     class PrioritizedReplayBuffer final : public ReplayBuffer {
     public:
         explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
-                                         int64_t batch_size, float alpha);
+                                         int64_t batch_size, float alpha, const std::string &segment_tree = "cpp");
 
-        [[nodiscard]] std::shared_ptr<torch::Tensor> generate_idx() const override;
+        [[nodiscard]] torch::Tensor generate_idx() const override;
 
-        [[nodiscard]] std::shared_ptr<torch::Tensor> get_weights(const torch::Tensor &idx, float beta) const;
+        [[nodiscard]] torch::Tensor get_weights(const torch::Tensor &idx, float beta) const;
 
         void update_priorities(const torch::Tensor &idx, const torch::Tensor &priorities);
 
         void add_batch(const str_to_tensor &data) override;
 
     private:
-        SegmentTreeCPP m_segment_tree;
+        std::shared_ptr<SegmentTree> m_segment_tree;
         float m_alpha;
         float m_max_priority;
         float m_min_priority;

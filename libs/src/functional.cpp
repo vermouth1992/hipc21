@@ -66,10 +66,6 @@ namespace rlu::nn {
         return model;
     }
 
-    std::vector<float> convert_tensor_to_flat_vector(const torch::Tensor &tensor) {
-        torch::Tensor t = torch::flatten(tensor);
-        return {t.data_ptr<float>(), t.data_ptr<float>() + t.numel()};
-    }
 }
 
 

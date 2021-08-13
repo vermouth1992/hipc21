@@ -6,7 +6,9 @@
 
 namespace rlu::replay_buffer {
     ReplayBuffer::ReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec,
-                               int64_t batch_size) : m_capacity(capacity), m_batch_size(batch_size) {
+                               int64_t batch_size) :
+            m_capacity(capacity),
+            m_batch_size(batch_size) {
         for (auto &it : data_spec) {
             auto name = it.first;
             auto shape = it.second.m_shape;
@@ -15,9 +17,9 @@ namespace rlu::replay_buffer {
         }
     }
 
-    std::unique_ptr<ReplayBuffer::str_to_tensor> ReplayBuffer::sample() {
+    ReplayBuffer::str_to_tensor ReplayBuffer::sample() {
         auto idx = generate_idx();
-        return this->operator[](*idx);
+        return this->operator[](idx);
     }
 
     void ReplayBuffer::reset() {
@@ -34,17 +36,17 @@ namespace rlu::replay_buffer {
     }
 
     // get data by index
-    std::unique_ptr<ReplayBuffer::str_to_tensor> ReplayBuffer::operator[](const torch::Tensor &idx) {
+    ReplayBuffer::str_to_tensor ReplayBuffer::operator[](const torch::Tensor &idx) {
         str_to_tensor output;
         for (auto &it : m_storage) {
             output[it.first] = it.second.index({idx});
         }
-        return std::make_unique<str_to_tensor>(output);
+        return output;
     }
 
 
     // get all the data
-    std::unique_ptr<ReplayBuffer::str_to_tensor> ReplayBuffer::get() {
+    ReplayBuffer::str_to_tensor ReplayBuffer::get() {
         torch::Tensor idx = torch::arange(m_size);
         return this->operator[](idx);
     }
@@ -86,33 +88,40 @@ namespace rlu::replay_buffer {
 
     }
 
-    std::shared_ptr<torch::Tensor> UniformReplayBuffer::generate_idx() const {
+    torch::Tensor UniformReplayBuffer::generate_idx() const {
         auto idx = torch::randint(size(), {m_batch_size}, torch::TensorOptions().dtype(torch::kInt64));
-        return std::make_unique<torch::Tensor>(idx);
-    }
-
-    PrioritizedReplayBuffer::PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
-                                                     int64_t batch_size, float alpha)
-            : ReplayBuffer(capacity, data_spec, batch_size),
-              m_segment_tree(capacity),
-              m_alpha(alpha),
-              m_max_priority(1.0),
-              m_min_priority(1.0) {
-
-    }
-
-    std::shared_ptr<torch::Tensor> PrioritizedReplayBuffer::generate_idx() const {
-        // generate index according to the priority
-        auto scalar = torch::rand({m_batch_size}) * m_segment_tree.reduce();
-        auto idx = m_segment_tree.get_prefix_sum_idx(scalar);
         return idx;
     }
 
-    std::shared_ptr<torch::Tensor>
-    PrioritizedReplayBuffer::get_weights(const torch::Tensor &idx, const float beta) const {
-        auto weights = m_segment_tree.operator[](idx);
-        *weights = torch::pow(*weights * ((float) size() / m_segment_tree.reduce()), -beta);
-        *weights = *weights / torch::max(*weights);
+    PrioritizedReplayBuffer::PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+                                                     int64_t batch_size, float alpha, const std::string &segment_tree)
+            : ReplayBuffer(capacity, data_spec, batch_size),
+              m_alpha(alpha),
+              m_max_priority(1.0),
+              m_min_priority(1.0) {
+        if (segment_tree == "cpp") {
+            m_segment_tree = std::make_shared<SegmentTreeCPP>(capacity);
+        } else if (segment_tree == "torch") {
+            m_segment_tree = std::make_shared<SegmentTreeTorch>(capacity);
+        } else if (segment_tree == "nary") {
+            m_segment_tree = std::make_shared<SegmentTreeNary>(capacity);
+        } else {
+            throw std::runtime_error(fmt::format("Unknown segment tree implementation {}", segment_tree));
+        }
+
+    }
+
+    torch::Tensor PrioritizedReplayBuffer::generate_idx() const {
+        // generate index according to the priority
+        auto scalar = torch::rand({m_batch_size}) * m_segment_tree->reduce();
+        auto idx = m_segment_tree->get_prefix_sum_idx(scalar);
+        return idx;
+    }
+
+    torch::Tensor PrioritizedReplayBuffer::get_weights(const torch::Tensor &idx, const float beta) const {
+        auto weights = m_segment_tree->operator[](idx);
+        weights = torch::pow(weights * ((float) size() / m_segment_tree->reduce()), -beta);
+        weights = weights / torch::max(weights);
         return weights;
     }
 
@@ -120,7 +129,7 @@ namespace rlu::replay_buffer {
         auto new_priority = torch::pow(torch::abs(priorities + 1e-6), m_alpha);
         m_max_priority = std::max(m_max_priority, torch::max(new_priority).item().toFloat());
         m_min_priority = std::min(m_min_priority, torch::min(new_priority).item().toFloat());
-        m_segment_tree.set(idx, new_priority);
+        m_segment_tree->set(idx, new_priority);
     }
 
     void PrioritizedReplayBuffer::add_batch(const str_to_tensor &data) {
@@ -142,13 +151,13 @@ namespace rlu::replay_buffer {
         }
 
         if (m_ptr + batch_size > capacity()) {
-            m_segment_tree.set(torch::arange(m_ptr, capacity()),
-                               priority.index({Slice(None, capacity() - m_ptr)}));
-            m_segment_tree.set(torch::arange(batch_size - (capacity() - m_ptr)),
-                               priority.index({Slice(capacity() - m_ptr, None)}));
+            m_segment_tree->set(torch::arange(m_ptr, capacity()),
+                                priority.index({Slice(None, capacity() - m_ptr)}));
+            m_segment_tree->set(torch::arange(batch_size - (capacity() - m_ptr)),
+                                priority.index({Slice(capacity() - m_ptr, None)}));
         } else {
             auto index = torch::arange(m_ptr, m_ptr + batch_size);
-            m_segment_tree.set(index, priority);
+            m_segment_tree->set(index, priority);
         }
 
         m_ptr = (m_ptr + batch_size) % capacity();

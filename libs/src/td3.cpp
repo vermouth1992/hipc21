@@ -122,7 +122,7 @@ namespace rlu::agent {
         q_optimizer->step();
         for (int i = 0; i < 2; i++) {
             m_logger->store(fmt::format("Q{}Vals", i + 1),
-                            rlu::nn::convert_tensor_to_flat_vector(q_values.index({0}).detach()));
+                            rlu::nn::convert_tensor_to_flat_vector<float>(q_values.index({0}).detach()));
         }
         m_logger->store("LossQ", q_values_loss.item<float>());
     }

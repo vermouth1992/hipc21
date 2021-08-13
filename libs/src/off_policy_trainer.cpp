@@ -167,7 +167,7 @@ namespace rlu::trainer {
                     // generate index
                     auto idx = buffer->generate_idx();
                     // retrieve the actual data
-                    auto data = *buffer->operator[](*idx);
+                    auto data = buffer->operator[](idx);
                     // training
                     agent->train_step(data["obs"].to(device),
                                       data["act"].to(device),

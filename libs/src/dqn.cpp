@@ -69,7 +69,7 @@ namespace rlu::agent {
         };
 
         // logging
-        m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector(q_values));
+        m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector<float>(q_values));
         m_logger->store("LossQ", loss.item<float>());
 
         return log_data;

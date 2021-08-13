@@ -16,7 +16,12 @@ namespace rlu::nn {
                               std::optional<float> dropout = std::nullopt
     );
 
-    std::vector<float> convert_tensor_to_flat_vector(const torch::Tensor &tensor);
+    // template function implemented in the header.
+    template<typename T>
+    std::vector<T> convert_tensor_to_flat_vector(const torch::Tensor &tensor) {
+        torch::Tensor t = torch::flatten(tensor);
+        return {t.data_ptr<T>(), t.data_ptr<T>() + t.numel()};
+    }
 }
 
 
