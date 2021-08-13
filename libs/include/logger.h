@@ -19,7 +19,7 @@
 #include "fmt/compile.h"
 
 
-namespace rlu {
+namespace rlu::logger {
     namespace fs = std::filesystem;
     using json = nlohmann::json;
 

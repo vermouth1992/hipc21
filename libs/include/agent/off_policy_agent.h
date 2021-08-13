@@ -23,7 +23,7 @@ namespace rlu::agent {
 
         void update_target_q(bool soft);
 
-        void set_logger(const std::shared_ptr<rlu::EpochLogger> &logger);
+        void set_logger(const std::shared_ptr<rlu::logger::EpochLogger> &logger);
 
         virtual void log_tabular() = 0;
 
@@ -44,7 +44,7 @@ namespace rlu::agent {
         float q_lr{};
         float gamma{};
         std::unique_ptr<torch::optim::Optimizer> q_optimizer;
-        std::shared_ptr<rlu::EpochLogger> m_logger;
+        std::shared_ptr<rlu::logger::EpochLogger> m_logger;
     };
 }
 

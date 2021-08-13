@@ -3,7 +3,7 @@
 //
 
 #include "trainer/off_policy_trainer.h"
-
+#include "nameof.hpp"
 
 namespace rlu::trainer {
 
@@ -34,10 +34,11 @@ namespace rlu::trainer {
     void OffPolicyTrainer::setup_logger(std::optional<std::string> exp_name, const std::string &data_dir) {
         // setup logger
         if (exp_name == std::nullopt) {
-            exp_name.emplace(env->env_id + "_" + std::string(typeid(*agent).name()));
+            auto &r = *agent;
+            exp_name.emplace(env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
         }
-        auto output_dir = rlu::setup_logger_kwargs(exp_name.value(), seed, data_dir);
-        logger = std::make_shared<rlu::EpochLogger>(output_dir, exp_name.value());
+        auto output_dir = rlu::logger::setup_logger_kwargs(exp_name.value(), seed, data_dir);
+        logger = std::make_shared<rlu::logger::EpochLogger>(output_dir, exp_name.value());
         agent->set_logger(logger);
     }
 

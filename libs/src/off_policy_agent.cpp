@@ -14,7 +14,7 @@ namespace rlu::agent {
         }
     }
 
-    void OffPolicyAgent::set_logger(const std::shared_ptr<rlu::EpochLogger> &logger) {
+    void OffPolicyAgent::set_logger(const std::shared_ptr<rlu::logger::EpochLogger> &logger) {
         this->m_logger = logger;
     }
 

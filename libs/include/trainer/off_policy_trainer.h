@@ -49,7 +49,7 @@ namespace rlu::trainer {
         std::shared_ptr<rlu::replay_buffer::ReplayBuffer> buffer;
         const std::shared_ptr<Gym::Environment> env;
         const std::shared_ptr<Gym::Environment> test_env;
-        std::shared_ptr<rlu::EpochLogger> logger;
+        std::shared_ptr<rlu::logger::EpochLogger> logger;
         const std::shared_ptr<agent::OffPolicyAgent> agent;
         const int64_t epochs;
         const int64_t steps_per_epoch;
