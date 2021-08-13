@@ -6,7 +6,7 @@
 #include <random>
 #include <torch/torch.h>
 #include "nlohmann/json.hpp"
-#include "fmt/core.h"
+#include "fmt/format.h"
 
 using nlohmann::json;
 

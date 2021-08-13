@@ -7,6 +7,7 @@
 
 
 #include <string>
+#include <chrono>
 
 namespace rlu::watcher {
     class StopWatcher {

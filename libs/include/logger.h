@@ -15,7 +15,7 @@
 #include <optional>
 #include "nlohmann/json.hpp"
 #include "common.h"
-#include "fmt/core.h"
+#include "fmt/format.h"
 #include "fmt/compile.h"
 
 

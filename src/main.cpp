@@ -2,11 +2,11 @@
 // Created by chi on 7/2/21.
 //
 
+#define FMT_HEADER_ONLY
 
 #include "agent/dqn.h"
 #include "agent/td3.h"
 #include "trainer/off_policy_trainer.h"
-#include "fmt/core.h"
 #include "cxxopts.hpp"
 
 static cxxopts::ParseResult parse(int argc, char *argv[]) {

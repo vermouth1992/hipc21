@@ -18,6 +18,8 @@ set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 
+find_package(pybind11 REQUIRED)
+find_package(fmt REQUIRED)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
 
@@ -25,7 +27,6 @@ include_directories("libs/include" "${LIBTORCH}/include" "envs/binding-cpp/inclu
 link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
-find_package(pybind11)
 add_subdirectory(Google_tests)
 add_subdirectory(libs)
 add_subdirectory(envs)
@@ -37,6 +38,5 @@ set(SOURCE_FILES
 
 add_executable(hipc21 ${SOURCE_FILES})
 
-find_package(fmt)
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" curl fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
 

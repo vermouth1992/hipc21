@@ -25,7 +25,7 @@ TEST(Array, cache) {
     int64_t start_idx = size - 1;
     float result = 0.;
 
-    StopWatcher half, seq;
+    rlu::watcher::StopWatcher half, seq;
 
     half.start();
     for (int i = 0; i < iterations; ++i) {

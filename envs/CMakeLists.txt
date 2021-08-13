@@ -5,4 +5,4 @@ set(LIBSOURCE
         )
 
 add_library(gym_cpp ${LIBSOURCE})
-target_link_libraries(gym_cpp "${TORCH_LIBRARIES}")
+target_link_libraries(gym_cpp "${TORCH_LIBRARIES}" curl fmt::fmt)
