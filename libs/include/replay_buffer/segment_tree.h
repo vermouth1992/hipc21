@@ -8,7 +8,6 @@
 #include <torch/torch.h>
 #include <vector>
 #include "nn/functional.h"
-//#include "spdlog/spdlog.h"
 
 namespace rlu::replay_buffer {
     class SegmentTree {

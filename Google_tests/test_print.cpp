@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 #include <iostream>
+#include "fmt/format.h"
 
 TEST(common, optional) {
 //     the usage is very similar to Python None.

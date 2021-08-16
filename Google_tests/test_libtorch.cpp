@@ -8,11 +8,29 @@
 #include "base64.h"
 #include "nn/functional.h"
 #include <fstream>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
 
 using nlohmann::json;
 
 torch::Tensor same(const torch::Tensor &tensor) {
     return tensor;
+}
+
+TEST(Libtorch, grad) {
+    auto model = rlu::nn::build_mlp(5, 2, 2, 3, "tanh");
+    torch::Tensor data = torch::ones({2, 5}, torch::TensorOptions().dtype(torch::kFloat32));
+    torch::Tensor out = torch::sum(model->forward(data));
+    auto g = torch::autograd::grad({out}, model->parameters());
+    fmt::print("{}\n, {}\n, {}\n", out, g, model->parameters());
+    out.backward();
+//    fmt::print("{}\n", data.grad());
+//    out = torch::sum(data);
+//    g = torch::autograd::grad({out}, model->parameters());
+//    fmt::print("{}\n", g);
+//    out.backward();
+//    fmt::print("{}\n", data.grad());
 }
 
 TEST(Libtorch, tensor_size) {

@@ -22,20 +22,15 @@ namespace rlu::trainer {
         explicit OffPolicyTrainer(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
                                   const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                   int64_t epochs,
-                                  int64_t
-                                  steps_per_epoch,
+                                  int64_t steps_per_epoch,
                                   int64_t start_steps,
-                                  int64_t
-                                  update_after,
+                                  int64_t update_after,
                                   int64_t update_every,
-                                  int64_t
-                                  update_per_step,
+                                  int64_t update_per_step,
                                   int64_t policy_delay,
-                                  int64_t
-                                  num_test_episodes,
+                                  int64_t num_test_episodes,
                                   torch::Device device,
-                                  int64_t
-                                  seed);;
+                                  int64_t seed);
 
         void setup_logger(std::optional<std::string> exp_name, const std::string &data_dir);
 
