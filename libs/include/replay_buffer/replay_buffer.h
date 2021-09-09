@@ -84,6 +84,8 @@ namespace rlu::replay_buffer {
 
         void add_batch(const str_to_tensor &data) override;
 
+        void add_batch(const str_to_tensor &data, const torch::Tensor &priorities);
+
     private:
         std::shared_ptr<SegmentTree> m_segment_tree;
         float m_alpha;

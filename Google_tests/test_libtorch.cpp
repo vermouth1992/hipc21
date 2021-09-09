@@ -20,17 +20,27 @@ torch::Tensor same(const torch::Tensor &tensor) {
 
 TEST(Libtorch, grad) {
     auto model = rlu::nn::build_mlp(5, 2, 2, 3, "tanh");
+    fmt::print("The number of parameters is {}\n\n", model->parameters().size());
     torch::Tensor data = torch::ones({2, 5}, torch::TensorOptions().dtype(torch::kFloat32));
     torch::Tensor out = torch::sum(model->forward(data));
     auto g = torch::autograd::grad({out}, model->parameters());
-    fmt::print("{}\n, {}\n, {}\n", out, g, model->parameters());
-    out.backward();
-//    fmt::print("{}\n", data.grad());
+    fmt::print("{}\n, grads:\n{}\n, parameters:\n{}\n\n", out, g, model->parameters());
+//    out.backward();
+    fmt::print("{}\n\n", model->parameters()[0].grad());
+    model->parameters()[0].mutable_grad() = g[0];
+    fmt::print("{}\n\n", model->parameters()[0].grad());
 //    out = torch::sum(data);
 //    g = torch::autograd::grad({out}, model->parameters());
 //    fmt::print("{}\n", g);
 //    out.backward();
 //    fmt::print("{}\n", data.grad());
+}
+
+TEST(Libtorch, cat) {
+    torch::Tensor a = torch::arange(10, 14);
+    torch::Tensor b = torch::arange(5);
+    torch::Tensor c = torch::cat({a, b}, 0);
+    fmt::print("{}\n", c);
 }
 
 TEST(Libtorch, tensor_size) {

@@ -9,7 +9,7 @@ namespace rlu::replay_buffer {
                                int64_t batch_size) :
             m_capacity(capacity),
             m_batch_size(batch_size) {
-        for (auto &it : data_spec) {
+        for (auto &it: data_spec) {
             auto name = it.first;
             auto shape = it.second.m_shape;
             shape.insert(shape.begin(), capacity);
@@ -38,7 +38,7 @@ namespace rlu::replay_buffer {
     // get data by index
     ReplayBuffer::str_to_tensor ReplayBuffer::operator[](const torch::Tensor &idx) {
         str_to_tensor output;
-        for (auto &it : m_storage) {
+        for (auto &it: m_storage) {
             output[it.first] = it.second.index({idx});
         }
         return output;
@@ -57,7 +57,7 @@ namespace rlu::replay_buffer {
         if (m_ptr + batch_size > capacity()) {
             std::cout << "Reaches the end of the replay buffer" << std::endl;
         }
-        for (auto &it : data) {
+        for (auto &it: data) {
             AT_ASSERT(batch_size == it.second.sizes()[0]);
             if (m_ptr + batch_size > capacity()) {
                 m_storage[it.first].index_put_({Slice(m_ptr, None)},
@@ -105,6 +105,8 @@ namespace rlu::replay_buffer {
             m_segment_tree = std::make_shared<SegmentTreeTorch>(capacity);
         } else if (segment_tree == "nary") {
             m_segment_tree = std::make_shared<SegmentTreeNary>(capacity);
+        } else if (segment_tree == "fpga") {
+            m_segment_tree = std::make_shared<SegmentTreeFPGA>(capacity);
         } else {
             throw std::runtime_error(fmt::format("Unknown segment tree implementation {}", segment_tree));
         }
@@ -113,6 +115,7 @@ namespace rlu::replay_buffer {
 
     torch::Tensor PrioritizedReplayBuffer::generate_idx() const {
         // generate index according to the priority
+        return m_segment_tree->sample_idx(m_batch_size);
         auto scalar = torch::rand({m_batch_size}) * m_segment_tree->reduce();
         auto idx = m_segment_tree->get_prefix_sum_idx(scalar);
         return idx;
@@ -132,13 +135,19 @@ namespace rlu::replay_buffer {
         m_segment_tree->set(idx, new_priority);
     }
 
+    // default priority to the maximum priority
     void PrioritizedReplayBuffer::add_batch(const str_to_tensor &data) {
         int64_t batch_size = data.begin()->second.sizes()[0];
-        auto priority = torch::ones({batch_size}) * m_max_priority;
+        auto priorities = torch::ones({batch_size}) * m_max_priority;
+        this->add_batch(data, priorities);
+    }
+
+    void PrioritizedReplayBuffer::add_batch(const ReplayBuffer::str_to_tensor &data, const torch::Tensor &priorities) {
+        int64_t batch_size = data.begin()->second.sizes()[0];
         if (m_ptr + batch_size > capacity()) {
             std::cout << "Reaches the end of the replay buffer" << std::endl;
         }
-        for (auto &it : data) {
+        for (auto &it: data) {
             AT_ASSERT(batch_size == it.second.sizes()[0]);
             if (m_ptr + batch_size > capacity()) {
                 m_storage[it.first].index_put_({Slice(m_ptr, None)},
@@ -150,15 +159,15 @@ namespace rlu::replay_buffer {
             }
         }
 
+        // update priority
+        torch::Tensor idx;
         if (m_ptr + batch_size > capacity()) {
-            m_segment_tree->set(torch::arange(m_ptr, capacity()),
-                                priority.index({Slice(None, capacity() - m_ptr)}));
-            m_segment_tree->set(torch::arange(batch_size - (capacity() - m_ptr)),
-                                priority.index({Slice(capacity() - m_ptr, None)}));
+            idx = torch::cat({torch::arange(m_ptr, capacity()), torch::arange(batch_size - (capacity() - m_ptr))}, 0);
         } else {
-            auto index = torch::arange(m_ptr, m_ptr + batch_size);
-            m_segment_tree->set(index, priority);
+            idx = torch::arange(m_ptr, m_ptr + batch_size);
         }
+
+        this->update_priorities(idx, priorities);
 
         m_ptr = (m_ptr + batch_size) % capacity();
         m_size = std::min(m_size + batch_size, capacity());

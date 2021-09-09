@@ -8,6 +8,7 @@
 #include <torch/torch.h>
 #include <vector>
 #include "nn/functional.h"
+#include "exception.h"
 
 namespace rlu::replay_buffer {
     class SegmentTree {
@@ -23,6 +24,49 @@ namespace rlu::replay_buffer {
         [[nodiscard]] virtual auto reduce() const -> float = 0;
 
         [[nodiscard]] virtual auto get_prefix_sum_idx(torch::Tensor value) const -> torch::Tensor = 0;
+
+        // for compatible with the abstraction of the FPGA segment tree
+        [[nodiscard]] virtual auto sample_idx(int64_t batch_size) const -> torch::Tensor;
+    };
+
+    class SegmentTreeFPGA final : public SegmentTree {
+    public:
+        explicit SegmentTreeFPGA(int64_t size) {
+
+        }
+
+        // query the FPGA about the size of the segment tree.
+        [[nodiscard]] int64_t size() const override {
+            throw NotImplemented();
+        }
+
+        // query the FPGA about the weights in the segment tree
+        torch::Tensor operator[](const torch::Tensor &idx) const override {
+            throw NotImplemented();
+        }
+
+        void set(const torch::Tensor &idx, const torch::Tensor &value) override {
+            // TODO: set the priority of idx to value on the FPGA. This function must be implemented
+            // tensor shape: one dimension array idx: M, value M
+            throw NotImplemented();
+        }
+
+        [[nodiscard]] float reduce(int64_t start, int64_t end) const override {
+            throw NotImplemented();
+        }
+
+        [[nodiscard]] float reduce() const override {
+            throw NotImplemented();
+        }
+
+        [[nodiscard]] torch::Tensor get_prefix_sum_idx(torch::Tensor value) const override {
+            throw NotImplemented();
+        }
+
+        [[nodiscard]] torch::Tensor sample_idx(int64_t batch_size) const override {
+            // TODO: this function must be implemented
+            throw NotImplemented();
+        }
 
     };
 

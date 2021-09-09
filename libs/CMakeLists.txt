@@ -21,7 +21,8 @@ set(LIBSOURCE
         src/off_policy_agent.cpp
         src/off_policy_trainer.cpp
         src/off_policy_trainer_parallel.cpp
-        src/logger.cpp)
+        src/logger.cpp
+        src/off_policy_trainer_fpga.cpp)
 
 add_library(rlu ${LIBSOURCE})
 target_link_libraries(rlu "${TORCH_LIBRARIES}" fmt::fmt)

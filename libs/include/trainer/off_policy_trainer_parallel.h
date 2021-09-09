@@ -13,6 +13,7 @@
 namespace rlu::trainer {
 
     class OffPolicyTrainerParallel : public OffPolicyTrainer {
+    public:
         explicit OffPolicyTrainerParallel(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
                                           const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                           int64_t epochs,
@@ -40,7 +41,8 @@ namespace rlu::trainer {
                         num_test_episodes,
                         device,
                         seed
-                ) {
+                ),
+                actor(agent_fn()) {
             for (int i = 0; i < num_actors; i++) {
                 envs.push_back(env_fn());
                 actor_mutexes.emplace_back();
@@ -49,21 +51,20 @@ namespace rlu::trainer {
             for (int i = 0; i < num_learners; i++) {
                 learner_threads.emplace_back();
             }
+            rlu::functional::hard_update(*actor, *agent);
         }
 
-    public:
+
         void train() override {
             // start actor threads
             this->start_actor_threads();
             // start learner threads
             this->start_learner_threads();
-            // start aggregator thread
-            this->start_aggregator_thread();
             // wait and join
-            for (auto &thread : actor_threads) {
+            for (auto &thread: actor_threads) {
                 pthread_join(thread, nullptr);
             }
-            for (auto &thread : learner_threads) {
+            for (auto &thread: learner_threads) {
                 pthread_join(thread, nullptr);
             }
         }
@@ -106,7 +107,7 @@ namespace rlu::trainer {
                 } else {
                     // hold actor mutex. Should be mutually exclusive when copying the weights from learner to the actor
                     pthread_mutex_lock(&actor_mutexes[index]);
-                    action = agent->act_single(current_obs.to(device), true).to(cpu);
+                    action = actor->act_single(current_obs.to(device), true).to(cpu);
                     pthread_mutex_unlock(&actor_mutexes[index]);
                 }
 
@@ -119,6 +120,10 @@ namespace rlu::trainer {
                 bool true_done = s.done & (!s.timeout);
                 auto done_tensor = torch::tensor({true_done},
                                                  torch::TensorOptions().dtype(torch::kFloat32));
+
+                // store the data in a temporary buffer and wait for every batch size to store together
+
+                // compute the priority
 
                 // store data to the replay buffer
                 buffer->add_single({
@@ -147,18 +152,33 @@ namespace rlu::trainer {
 
         virtual void learner_fn_internal(size_t index) {
             // sample a batch of data.
+            // generate index
+            auto idx = buffer->generate_idx();
+            // retrieve the actual data
+            auto data = buffer->operator[](idx);
+            // training
+            agent->train_step(data["obs"].to(device),
+                              data["act"].to(device),
+                              data["next_obs"].to(device),
+                              data["rew"].to(device),
+                              data["done"].to(device),
+                              std::nullopt,
+                              num_updates % policy_delay == 0);
+            num_updates += 1;
 
-            // compute the gradients
+            for (auto &m: actor_mutexes) {
+                pthread_mutex_lock(&m);
+            }
+            rlu::functional::hard_update(*actor, *agent);
+            for (auto &m: actor_mutexes) {
+                pthread_mutex_unlock(&m);
+            }
+
+            // compute the gradients and store in the corresponding position
 
             // atomically increase the done flag
 
-            // conditional wait for aggregator to update the weights
-        }
-
-        virtual void aggregator_fn_internal() {
-            // conditional wait for the done flag
-
-            // aggregate the gradients
+            // last thread aggregate the gradients, otherwise, conditional wait for the done signal
 
             // set the gradients
 
@@ -204,12 +224,21 @@ namespace rlu::trainer {
             }
         }
 
-        void start_aggregator_thread() {
-            int ret = pthread_create(&aggregator_thread, nullptr, &aggregator_fn, this);
-            if (ret != 0) {
-                MSG("Fail to create tester thread with error code " << ret);
-            }
-        }
+        // agents
+        const std::shared_ptr<agent::OffPolicyAgent> actor;
+        // threads
+        std::vector<pthread_t> actor_threads;
+        std::vector<pthread_t> learner_threads;
+        pthread_t tester_thread{};
+        // environments
+        std::vector<std::shared_ptr<Gym::Environment>> envs;
+        // mutexes
+        pthread_mutex_t global_steps_mutex{};
+        std::vector<pthread_mutex_t> actor_mutexes;
+        // gradients
+        std::vector<std::vector<torch::Tensor>> grads;
+        // others
+        int64_t current_global_steps{};
 
     private:
         static void *actor_fn(void *param_) {
@@ -235,24 +264,6 @@ namespace rlu::trainer {
             return nullptr;
         }
 
-        static void *aggregator_fn(void *This) {
-            ((OffPolicyTrainerParallel *) This)->aggregator_fn_internal();
-            return nullptr;
-        }
-        // agents
-
-        // threads
-        std::vector<pthread_t> actor_threads;
-        std::vector<pthread_t> learner_threads;
-        pthread_t tester_thread{};
-        pthread_t aggregator_thread{};
-        // environments
-        std::vector<std::shared_ptr<Gym::Environment>> envs;
-        // mutexes
-        pthread_mutex_t global_steps_mutex{};
-        std::vector<pthread_mutex_t> actor_mutexes;
-        // others
-        int64_t current_global_steps{};
 
     };
 }

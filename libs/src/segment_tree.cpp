@@ -497,3 +497,9 @@ int64_t rlu::replay_buffer::SegmentTreeCPPOpt::get_last_row_first_element_inside
 int64_t rlu::replay_buffer::SegmentTreeCPPOpt::get_parent_block_idx(int64_t block_idx) const {
     return (block_idx - 1) >> (m_partition_height - 1);
 }
+
+auto rlu::replay_buffer::SegmentTree::sample_idx(int64_t batch_size) const -> torch::Tensor {
+    auto scalar = torch::rand({batch_size}) * reduce();
+    auto idx = this->get_prefix_sum_idx(scalar);
+    return idx;
+}

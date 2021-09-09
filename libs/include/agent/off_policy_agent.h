@@ -27,6 +27,7 @@ namespace rlu::agent {
 
         virtual void log_tabular() = 0;
 
+        // train one step
         virtual str_to_tensor train_step(const torch::Tensor &obs,
                                          const torch::Tensor &act,
                                          const torch::Tensor &next_obs,
@@ -34,6 +35,8 @@ namespace rlu::agent {
                                          const torch::Tensor &done,
                                          const std::optional<torch::Tensor> &importance_weights,
                                          bool update_target) = 0;
+
+        // start parallel training threads and let them run
 
         virtual torch::Tensor act_single(const torch::Tensor &obs, bool exploration) = 0;
 
