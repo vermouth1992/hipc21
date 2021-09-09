@@ -82,6 +82,9 @@ namespace rlu::trainer {
                 pthread_mutex_unlock(&global_steps_mutex);
 
                 // increase the number of gradient steps
+
+                // copy the weights from FPGA to the CPU
+                synchronize_weights();
             }
 
 
@@ -90,7 +93,13 @@ namespace rlu::trainer {
     private:
         // initialize the bitstream
         void initialize_bitstream(const std::string &filepath) {
-            // TODO:
+            // TODO: initialize the bitstream and push to the FPGA
+        }
+
+        void synchronize_weights() {
+            // synchronize the weights from the FPGA to the CPU. The CPU weights is in
+            // actor->parameters(). Actor is a torch::nn::Module. It is a 3-layer MLP with relu activation
+            // The weights can be referred by index. For example, actor->parameters()[0], etc
         }
 
     };
