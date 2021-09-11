@@ -75,6 +75,9 @@ namespace rlu::trainer {
         }
 
     protected:
+        /*
+         * atomically get the global environmental steps with optional increments
+         */
         int64_t get_global_steps(bool increment) {
             int64_t global_steps_temp;
             pthread_mutex_lock(&global_steps_mutex);
@@ -189,6 +192,7 @@ namespace rlu::trainer {
 
                 // atomically increase the done flag
                 pthread_mutex_lock(&learner_barrier);
+                num_finished_learners += 1;
                 if (num_finished_learners == this->get_num_learners()) {
                     // last thread aggregate the gradients, otherwise, conditional wait for the done signal
                     auto aggregated_grads = this->aggregate_grads();
@@ -205,10 +209,10 @@ namespace rlu::trainer {
                     for (auto &m: actor_mutexes) {
                         pthread_mutex_unlock(&m);
                     }
+                    num_finished_learners = 0;
                     // broadcast
                     pthread_cond_broadcast(&learner_cond);
                 } else {
-                    num_finished_learners += 1;
                     // wait the aggregator
                     pthread_cond_wait(&learner_cond, &learner_barrier);
                 }

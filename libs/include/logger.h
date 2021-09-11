@@ -13,6 +13,7 @@
 #include <vector>
 #include <numeric>
 #include <optional>
+#include <pthread.h>
 #include "nlohmann/json.hpp"
 #include "common.h"
 #include "fmt/format.h"
@@ -39,7 +40,6 @@ namespace rlu::logger {
 
         void save_config(json &root);
 
-
         void log_tabular(const std::string &key, float val);
 
         virtual void dump_tabular();
@@ -51,6 +51,15 @@ namespace rlu::logger {
         std::vector<std::string> m_log_headers;
         std::map<std::string, float> m_log_current_row;
         const std::string m_exp_name;
+        const std::string delimiter = "\t";
+        int64_t max_key_len{};
+        int64_t n_slashes{};
+
+    private:
+        // use global locks to ensure thread safety
+        pthread_mutex_t mutex{};
+
+        void set_logger_style();
     };
 
     class EpochLogger final : public Logger {
@@ -65,14 +74,16 @@ namespace rlu::logger {
         void log_tabular(const std::string &key, std::optional<float> val, bool with_min_and_max = false,
                          bool average_only = false);
 
-        std::vector<float> get(const std::string &key) const;
+        std::vector<float> get(const std::string &key);
 
-        std::map<std::string, float> get_stats(const std::string &key, bool with_min_and_max, bool average_only) const;
+        std::map<std::string, float> get_stats(const std::string &key, bool with_min_and_max, bool average_only);
 
         void dump_tabular() override;
 
     protected:
         std::map<std::string, std::vector<float>> m_epoch_dict;
+    private:
+        pthread_mutex_t mutex{};
     };
 
 }

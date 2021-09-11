@@ -125,7 +125,11 @@ namespace rlu::logger {
         }
     }
 
+    /*
+     * log_tabular and dump_tabular can't
+     */
     void Logger::log_tabular(const std::string &key, float val) {
+        pthread_mutex_lock(&mutex);
         if (m_first_row) {
             m_log_headers.push_back(key);
         } else {
@@ -138,27 +142,29 @@ namespace rlu::logger {
                  fmt::format("You already set {} this iteration. Maybe you forgot to call dump_tabular()\n",
                              key).c_str());
         m_log_current_row[key] = val;
+        pthread_mutex_unlock(&mutex);
     }
 
-    void Logger::dump_tabular() {
-        const std::string delimiter = "\t";
-
+    void Logger::set_logger_style() {
         std::vector<int> key_lens;
-        for (auto &key : m_log_headers) {
+        for (auto &key: m_log_headers) {
             key_lens.push_back((int) key.size());
         }
         auto max_elem = *std::max_element(key_lens.begin(), key_lens.end());
-        auto max_key_len = std::max(15, max_elem);
-        auto n_slashes = 22 + max_key_len;
+        max_key_len = std::max(15, max_elem);
+        n_slashes = 22 + max_key_len;
+    }
 
+    void Logger::dump_tabular() {
         // header of the file
-        if (!m_output_dir.empty()) {
-            if (m_first_row) {
+        pthread_mutex_lock(&mutex);
+        if (m_first_row) {
+            set_logger_style();
+            if (!m_output_dir.empty()) {
                 auto s = string_join(m_log_headers, delimiter);
                 m_output_file << s << std::endl;
             }
         }
-
         // print to console
         for (int i = 0; i < n_slashes; i++) {
             fmt::print("-");
@@ -188,24 +194,30 @@ namespace rlu::logger {
         // write to file
         m_log_current_row.clear();
         m_first_row = false;
+        pthread_mutex_unlock(&mutex);
     }
 
     void EpochLogger::store(const std::string &name, const std::vector<float> &data) {
+        pthread_mutex_lock(&mutex);
         if (!m_epoch_dict.contains(name)) {
             m_epoch_dict[name] = std::vector<float>();
         }
         m_epoch_dict[name].insert(m_epoch_dict[name].end(), data.begin(), data.end());
+        pthread_mutex_unlock(&mutex);
     }
 
     void EpochLogger::store(const std::string &name, float data) {
+        pthread_mutex_lock(&mutex);
         if (!m_epoch_dict.contains(name)) {
             m_epoch_dict[name] = std::vector<float>();
         }
         m_epoch_dict[name].push_back(data);
+        pthread_mutex_unlock(&mutex);
     }
 
     void EpochLogger::store(const std::map<std::string, std::vector<float>> &data) {
-        for (const auto &it : data) {
+        pthread_mutex_lock(&mutex);
+        for (const auto &it: data) {
             if (!m_epoch_dict.contains(it.first)) {
                 m_epoch_dict[it.first] = std::vector<float>();
             }
@@ -213,37 +225,47 @@ namespace rlu::logger {
                                           it.second.begin(),
                                           it.second.end());
         }
+        pthread_mutex_unlock(&mutex);
     }
 
     void EpochLogger::log_tabular(const std::string &key, std::optional<float> val, bool with_min_and_max,
                                   bool average_only) {
+        pthread_mutex_lock(&mutex);
         if (val != std::nullopt) {
             Logger::log_tabular(key, val.value());
         } else {
             auto v = m_epoch_dict.at(key);
             auto stats = statistics_scalar(v, average_only, with_min_and_max);
-            for (const auto &it : stats) {
+            for (const auto &it: stats) {
                 Logger::log_tabular(it.first + key, it.second);
             }
             m_epoch_dict[key].clear();
         }
+        pthread_mutex_unlock(&mutex);
     }
 
-    std::vector<float> EpochLogger::get(const std::string &key) const {
-        return m_epoch_dict.at(key);
+    std::vector<float> EpochLogger::get(const std::string &key) {
+        pthread_mutex_lock(&mutex);
+        auto result = m_epoch_dict.at(key);
+        pthread_mutex_unlock(&mutex);
+        return result;
     }
 
     std::map<std::string, float>
-    EpochLogger::get_stats(const std::string &key, bool with_min_and_max, bool average_only) const {
+    EpochLogger::get_stats(const std::string &key, bool with_min_and_max, bool average_only) {
+        pthread_mutex_lock(&mutex);
         auto v = m_epoch_dict.at(key);
         auto stats = statistics_scalar(v, average_only, with_min_and_max);
+        pthread_mutex_unlock(&mutex);
         return stats;
     }
 
     void EpochLogger::dump_tabular() {
+        pthread_mutex_lock(&mutex);
         Logger::dump_tabular();
-        for (const auto &it : m_epoch_dict) {
+        for (const auto &it: m_epoch_dict) {
             M_Assert(it.second.empty(), fmt::format("Key {} is not called using log_tabular\n", it.first).c_str());
         }
+        pthread_mutex_unlock(&mutex);
     }
 }
