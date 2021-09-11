@@ -38,6 +38,47 @@ namespace rlu::agent {
                                  const std::optional<torch::Tensor> &importance_weights,
                                  bool update_target) override;
 
+        str_to_tensor_list compute_grad(const torch::Tensor &obs,
+                                        const torch::Tensor &act,
+                                        const torch::Tensor &next_obs,
+                                        const torch::Tensor &rew,
+                                        const torch::Tensor &done,
+                                        const std::optional<torch::Tensor> &importance_weights,
+                                        bool update_target) override {
+            torch::Tensor target_q_values = this->compute_next_obs_q(next_obs, rew, done);
+            auto q_values = this->q_network.forward(obs);
+            q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1); // (None,)
+            auto loss = torch::square(q_values - target_q_values); // (None,)
+            if (importance_weights != std::nullopt) {
+                loss = loss * importance_weights.value();
+            }
+            loss = torch::mean(loss);
+            auto grads = torch::autograd::grad({loss}, this->q_network.ptr()->parameters());
+            str_to_tensor_list output{
+                    {"q_grads", grads}
+            };
+
+            // logging. Need synchronization
+            m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector<float>(q_values));
+            m_logger->store("LossQ", loss.item<float>());
+
+            return output;
+        }
+
+        void set_grad(const str_to_tensor_list &grads) override {
+            auto q_grad = grads.at("q_grads");
+            for (size_t i = 0; i < q_grad.size(); i++) {
+                this->q_network.ptr()->parameters().at(i).mutable_grad() = q_grad.at(i);
+            }
+        }
+
+        void update_step(bool update_target) override {
+            q_optimizer->step();
+            if (update_target) {
+                this->update_target_q(true);
+            }
+        }
+
 
         torch::Tensor act_single(const torch::Tensor &obs, bool exploration) override;
 
@@ -46,6 +87,28 @@ namespace rlu::agent {
         void log_tabular() override;
 
     protected:
+        torch::Tensor compute_next_obs_q(const torch::Tensor &next_obs,
+                                         const torch::Tensor &rew,
+                                         const torch::Tensor &done) {
+            // compute target values
+            torch::Tensor target_q_values;
+            {
+                torch::NoGradGuard no_grad;
+                target_q_values = this->target_q_network.forward(next_obs); // shape (None, act_dim)
+
+                if (m_double_q) {
+                    auto target_actions = std::get<1>(
+                            torch::max(this->q_network.forward(next_obs), -1)); // shape (None,)
+                    target_q_values = torch::gather(target_q_values, 1, target_actions.unsqueeze(1)).squeeze(1);
+                } else {
+                    target_q_values = std::get<0>(torch::max(target_q_values, -1));
+                }
+                target_q_values = rew + gamma * (1. - done) * target_q_values;
+            }
+            return target_q_values;
+        }
+
+
         int64_t m_act_dim;
         bool m_double_q;
         float m_epsilon_greedy;

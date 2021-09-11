@@ -50,10 +50,15 @@ namespace rlu::trainer {
             }
             for (int i = 0; i < num_learners; i++) {
                 learner_threads.emplace_back();
+                grads.push_back(nullptr);
             }
+            num_finished_learners = 0;
             rlu::functional::hard_update(*actor, *agent);
         }
 
+        [[nodiscard]] size_t get_num_learners() const {
+            return learner_threads.size();
+        }
 
         void train() override {
             // start actor threads
@@ -70,10 +75,21 @@ namespace rlu::trainer {
         }
 
     protected:
+        int64_t get_global_steps(bool increment) {
+            int64_t global_steps_temp;
+            pthread_mutex_lock(&global_steps_mutex);
+            global_steps_temp = total_steps;
+            if (increment) {
+                total_steps += 1;
+            }
+            pthread_mutex_unlock(&global_steps_mutex);
+            return global_steps_temp;
+        }
+
         virtual void actor_fn_internal(size_t index) {
             // get environment
             auto curr_env = envs.at(index);
-            int64_t global_steps_temp;
+
             Gym::State s;
             curr_env->reset(&s);
             int64_t max_global_steps = epochs * steps_per_epoch;
@@ -87,20 +103,16 @@ namespace rlu::trainer {
                 // copy observation
                 auto current_obs = s.observation;
 
-                pthread_mutex_lock(&global_steps_mutex);
-                global_steps_temp = total_steps;
+                int64_t global_steps_temp = this->get_global_steps(true);
                 // create a new thread for testing and logging
                 if (global_steps_temp % steps_per_epoch == 0) {
-                    current_global_steps = global_steps_temp;
                     this->start_tester_thread();
                 }
                 // determine whether to break
                 if (global_steps_temp >= max_global_steps) {
-                    pthread_mutex_unlock(&global_steps_mutex);
                     break;
                 }
-                total_steps += 1;
-                pthread_mutex_unlock(&global_steps_mutex);
+
 
                 if (global_steps_temp < start_steps) {
                     action = curr_env->action_space()->sample();
@@ -151,42 +163,58 @@ namespace rlu::trainer {
         }
 
         virtual void learner_fn_internal(size_t index) {
-            // sample a batch of data.
-            // generate index
-            auto idx = buffer->generate_idx();
-            // retrieve the actual data
-            auto data = buffer->operator[](idx);
-            // training
-            agent->train_step(data["obs"].to(device),
-                              data["act"].to(device),
-                              data["next_obs"].to(device),
-                              data["rew"].to(device),
-                              data["done"].to(device),
-                              std::nullopt,
-                              num_updates % policy_delay == 0);
-            num_updates += 1;
+            int64_t max_global_steps = epochs * steps_per_epoch;
+            while (true) {
+                // get global steps
+                int64_t global_steps_temp = this->get_global_steps(false);
+                if (global_steps_temp >= max_global_steps) {
+                    break;
+                }
+                bool update_target = num_updates % policy_delay == 0;
+                // sample a batch of data.
+                // generate index
+                auto idx = buffer->generate_idx();
+                // retrieve the actual data
+                auto data = buffer->operator[](idx);
+                // compute the gradients
+                auto local_grads = agent->compute_grad(data["obs"].to(device),
+                                                       data["act"].to(device),
+                                                       data["next_obs"].to(device),
+                                                       data["rew"].to(device),
+                                                       data["done"].to(device),
+                                                       std::nullopt,
+                                                       update_target);
+                // store the local grad in the shared memory
+                grads.at(index) = std::make_shared<str_to_tensor_list>(local_grads);
 
-            for (auto &m: actor_mutexes) {
-                pthread_mutex_lock(&m);
+                // atomically increase the done flag
+                pthread_mutex_lock(&learner_barrier);
+                if (num_finished_learners == this->get_num_learners()) {
+                    // last thread aggregate the gradients, otherwise, conditional wait for the done signal
+                    auto aggregated_grads = this->aggregate_grads();
+                    // set the gradients
+                    agent->set_grad(aggregated_grads);
+                    // optimizer step
+                    agent->update_step(update_target);
+                    num_updates += 1;
+                    // atomically copy weights to actors
+                    for (auto &m: actor_mutexes) {
+                        pthread_mutex_lock(&m);
+                    }
+                    rlu::functional::hard_update(*actor, *agent);
+                    for (auto &m: actor_mutexes) {
+                        pthread_mutex_unlock(&m);
+                    }
+                    // broadcast
+                    pthread_cond_broadcast(&learner_cond);
+                } else {
+                    num_finished_learners += 1;
+                    // wait the aggregator
+                    pthread_cond_wait(&learner_cond, &learner_barrier);
+                }
+
+                pthread_mutex_unlock(&learner_barrier);
             }
-            rlu::functional::hard_update(*actor, *agent);
-            for (auto &m: actor_mutexes) {
-                pthread_mutex_unlock(&m);
-            }
-
-            // compute the gradients and store in the corresponding position
-
-            // atomically increase the done flag
-
-            // last thread aggregate the gradients, otherwise, conditional wait for the done signal
-
-            // set the gradients
-
-            // optimizer step
-
-            // set done flag
-
-            // atomically copy weights to actors
         }
 
         virtual void tester_fn_internal() {
@@ -236,9 +264,11 @@ namespace rlu::trainer {
         pthread_mutex_t global_steps_mutex{};
         std::vector<pthread_mutex_t> actor_mutexes;
         // gradients
-        std::vector<std::vector<torch::Tensor>> grads;
+        std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others
-        int64_t current_global_steps{};
+        size_t num_finished_learners;
+        pthread_mutex_t learner_barrier{};
+        pthread_cond_t learner_cond{};
 
     private:
         static void *actor_fn(void *param_) {
@@ -264,6 +294,27 @@ namespace rlu::trainer {
             return nullptr;
         }
 
+        /*
+         * Aggregate the gradients
+         */
+        str_to_tensor_list aggregate_grads() {
+            str_to_tensor_list result;
+            for (auto &it: *grads.at(0)) {
+                result[it.first] = torch::autograd::variable_list(it.second.size());
+                // for each parameter
+                for (size_t i = 0; i < it.second.size(); i++) {
+                    std::vector<torch::Tensor> current_grad;
+                    // for each learner
+                    for (auto &learner_grad: grads) {
+                        auto param_grad = learner_grad->at(it.first); // a list of tensor
+                        current_grad.push_back(param_grad.at(i));
+                    }
+                    // aggregate
+                    result[it.first].at(i) = torch::mean(torch::stack(current_grad, 0), 0);
+                }
+            }
+            return result;
+        }
 
     };
 }

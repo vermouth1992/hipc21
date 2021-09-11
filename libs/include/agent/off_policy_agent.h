@@ -9,16 +9,17 @@
 #include <optional>
 #include "gym/gym.h"
 #include "logger.h"
+#include "type.h"
 #include "replay_buffer/replay_buffer.h"
 #include "utils/rl_functional.h"
 #include "utils/stop_watcher.h"
 
 namespace rlu::agent {
+
+
     // define a template class for general off-policy agent
     class OffPolicyAgent : public torch::nn::Module {
     public:
-        typedef std::map<std::string, torch::Tensor> str_to_tensor;
-
         explicit OffPolicyAgent(float tau, float q_lr, float gamma);
 
         void update_target_q(bool soft);
@@ -36,7 +37,20 @@ namespace rlu::agent {
                                          const std::optional<torch::Tensor> &importance_weights,
                                          bool update_target) = 0;
 
-        // start parallel training threads and let them run
+        // API for parallel training with the parameter server. The agent is the parameter server.
+        // compute the gradient and store the info in a dictionary
+        virtual str_to_tensor_list compute_grad(const torch::Tensor &obs,
+                                                const torch::Tensor &act,
+                                                const torch::Tensor &next_obs,
+                                                const torch::Tensor &rew,
+                                                const torch::Tensor &done,
+                                                const std::optional<torch::Tensor> &importance_weights,
+                                                bool update_target) = 0;
+
+        // set the gradients to the mode. Aggregation of the gradients should be done in the trainer
+        virtual void set_grad(const str_to_tensor_list &grads) = 0;
+
+        virtual void update_step(bool update_target) = 0;
 
         virtual torch::Tensor act_single(const torch::Tensor &obs, bool exploration) = 0;
 

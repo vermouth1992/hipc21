@@ -30,25 +30,12 @@ namespace rlu::agent {
         update_target_q(false);
     }
 
-    OffPolicyAgent::str_to_tensor
-    DQN::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                    const torch::Tensor &rew, const torch::Tensor &done,
-                    const std::optional<torch::Tensor> &importance_weights, bool update_target) {
+    str_to_tensor DQN::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                                  const torch::Tensor &rew, const torch::Tensor &done,
+                                  const std::optional<torch::Tensor> &importance_weights, bool update_target) {
 
         // compute target values
-        torch::Tensor target_q_values;
-        {
-            torch::NoGradGuard no_grad;
-            target_q_values = this->target_q_network.forward(next_obs); // shape (None, act_dim)
-
-            if (m_double_q) {
-                auto target_actions = std::get<1>(torch::max(this->q_network.forward(next_obs), -1)); // shape (None,)
-                target_q_values = torch::gather(target_q_values, 1, target_actions.unsqueeze(1)).squeeze(1);
-            } else {
-                target_q_values = std::get<0>(torch::max(target_q_values, -1));
-            }
-            target_q_values = rew + gamma * (1. - done) * target_q_values;
-        }
+        torch::Tensor target_q_values = this->compute_next_obs_q(next_obs, rew, done);
         q_optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs);
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1); // (None,)
