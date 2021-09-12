@@ -63,10 +63,11 @@ namespace rlu::trainer {
         float episode_length{};
         int64_t num_updates{};
         Gym::State s;
+        rlu::watcher::StopWatcher watcher;
+
+        void test_step(const std::shared_ptr<agent::OffPolicyAgent> &test_actor);
 
     private:
-        void test_step();
-
         void train_step();
 
         virtual void reset();

@@ -42,7 +42,8 @@ namespace rlu::trainer {
                         device,
                         seed
                 ),
-                actor(agent_fn()) {
+                actor(agent_fn()),
+                test_actor(agent_fn()) {
             for (int i = 0; i < num_actors; i++) {
                 envs.push_back(env_fn());
                 actor_mutexes.emplace_back();
@@ -61,6 +62,9 @@ namespace rlu::trainer {
         }
 
         void train() override {
+            // initialize
+            torch::manual_seed(seed);
+            watcher.start();
             // start actor threads
             this->start_actor_threads();
             // start learner threads
@@ -109,7 +113,9 @@ namespace rlu::trainer {
                 int64_t global_steps_temp = this->get_global_steps(true);
                 // create a new thread for testing and logging
                 if (global_steps_temp % steps_per_epoch == 0) {
-                    this->start_tester_thread();
+                    this->start_tester_thread({
+                                                      {"epoch", global_steps_temp / steps_per_epoch}
+                                              });
                 }
                 // determine whether to break
                 if (global_steps_temp >= max_global_steps) {
@@ -201,11 +207,14 @@ namespace rlu::trainer {
                     // optimizer step
                     agent->update_step(update_target);
                     num_updates += 1;
-                    // atomically copy weights to actors
+                    // atomically copy weights to actors and test_actors
                     for (auto &m: actor_mutexes) {
                         pthread_mutex_lock(&m);
                     }
+                    // TODO: need to optimize for PCIe transfer. First transfer to a CPU agent.
+                    // Then, perform atomic weight copy
                     rlu::functional::hard_update(*actor, *agent);
+                    rlu::functional::hard_update(*test_actor, *agent);
                     for (auto &m: actor_mutexes) {
                         pthread_mutex_unlock(&m);
                     }
@@ -221,14 +230,30 @@ namespace rlu::trainer {
             }
         }
 
-        virtual void tester_fn_internal() {
-            // copy the weights from learner. Should be mutually exclusive with optimizer step.
+        virtual void tester_fn_internal(const std::unordered_map<std::string, float> &param_) {
+            // test the current policy
+            for (int i = 0; i < num_test_episodes; ++i) {
+                test_step(this->test_actor);
+            }
+            // logging
+            watcher.lap();
 
-            // run tester function
+            // perform logging
+            logger->log_tabular("Epoch", param_.at("epoch"));
+            logger->log_tabular("EpRet", std::nullopt, true);
+            logger->log_tabular("EpLen", std::nullopt, false, true);
+            logger->log_tabular("TotalEnvInteracts", (float) total_steps);
+            logger->log_tabular("TestEpRet", std::nullopt, true);
+            logger->log_tabular("TestEpLen", std::nullopt, false, true);
+            agent->log_tabular();
+            logger->log_tabular("Time", (float) watcher.seconds());
+            logger->dump_tabular();
         }
 
-        void start_tester_thread() {
-            int ret = pthread_create(&tester_thread, nullptr, &tester_fn, this);
+        void start_tester_thread(const std::unordered_map<std::string, float> &param_) {
+            auto param = std::make_shared<std::pair<OffPolicyTrainerParallel *,
+                    std::unordered_map<std::string, float>>>(this, param_);
+            int ret = pthread_create(&tester_thread, nullptr, &tester_fn, param.get());
             if (ret != 0) {
                 MSG("Fail to create tester thread with error code " << ret);
             }
@@ -258,6 +283,7 @@ namespace rlu::trainer {
 
         // agents
         const std::shared_ptr<agent::OffPolicyAgent> actor;
+        const std::shared_ptr<agent::OffPolicyAgent> test_actor;
         // threads
         std::vector<pthread_t> actor_threads;
         std::vector<pthread_t> learner_threads;
@@ -267,6 +293,7 @@ namespace rlu::trainer {
         // mutexes
         pthread_mutex_t global_steps_mutex{};
         std::vector<pthread_mutex_t> actor_mutexes;
+        pthread_mutex_t test_actor_mutex{};
         // gradients
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others
@@ -293,8 +320,10 @@ namespace rlu::trainer {
             return nullptr;
         }
 
-        static void *tester_fn(void *This) {
-            ((OffPolicyTrainerParallel *) This)->tester_fn_internal();
+        static void *tester_fn(void *param_) {
+            auto param = (std::pair<OffPolicyTrainerParallel *, std::unordered_map<std::string, float>> *) param_;
+            OffPolicyTrainerParallel *This = param->first;
+            ((OffPolicyTrainerParallel *) This)->tester_fn_internal(param->second);
             return nullptr;
         }
 

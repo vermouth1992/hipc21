@@ -67,7 +67,6 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::train() {
         torch::manual_seed(seed);
-        rlu::watcher::StopWatcher watcher;
         watcher.start();
         env->reset(&s);
 
@@ -81,7 +80,7 @@ namespace rlu::trainer {
 
             // test the current policy
             for (int i = 0; i < num_test_episodes; ++i) {
-                test_step();
+                test_step(this->agent);
             }
 
             watcher.lap();
@@ -99,14 +98,14 @@ namespace rlu::trainer {
         }
     }
 
-    void OffPolicyTrainer::test_step() {
+    void OffPolicyTrainer::test_step(const std::shared_ptr<agent::OffPolicyAgent> &test_actor) {
         Gym::State test_s;
         // testing variables
         test_env->reset(&test_s);
         float test_episode_reward = 0;
         float test_episode_length = 0;
         while (true) {
-            auto tensor_action = agent->act_single(test_s.observation.to(device), false).to(cpu);
+            auto tensor_action = test_actor->act_single(test_s.observation.to(device), false).to(cpu);
             test_env->step(tensor_action, false, &test_s);
             test_episode_reward += test_s.reward;
             test_episode_length += 1;
@@ -136,6 +135,8 @@ namespace rlu::trainer {
         bool true_done = s.done & (!s.timeout);
         auto done_tensor = torch::tensor({true_done},
                                          torch::TensorOptions().dtype(torch::kFloat32));
+
+        //
 
         // store data to the replay buffer
         buffer->add_single({

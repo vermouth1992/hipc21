@@ -17,7 +17,7 @@ namespace rlu::replay_buffer {
         }
     }
 
-    ReplayBuffer::str_to_tensor ReplayBuffer::sample() {
+    str_to_tensor ReplayBuffer::sample() {
         auto idx = generate_idx();
         return this->operator[](idx);
     }
@@ -36,7 +36,7 @@ namespace rlu::replay_buffer {
     }
 
     // get data by index
-    ReplayBuffer::str_to_tensor ReplayBuffer::operator[](const torch::Tensor &idx) {
+    str_to_tensor ReplayBuffer::operator[](const torch::Tensor &idx) {
         str_to_tensor output;
         for (auto &it: m_storage) {
             output[it.first] = it.second.index({idx});
@@ -46,7 +46,7 @@ namespace rlu::replay_buffer {
 
 
     // get all the data
-    ReplayBuffer::str_to_tensor ReplayBuffer::get() {
+    str_to_tensor ReplayBuffer::get() {
         torch::Tensor idx = torch::arange(m_size);
         return this->operator[](idx);
     }
@@ -82,7 +82,7 @@ namespace rlu::replay_buffer {
         this->add_batch(batch_data);
     }
 
-    UniformReplayBuffer::UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+    UniformReplayBuffer::UniformReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec,
                                              int64_t batch_size)
             : ReplayBuffer(capacity, data_spec, batch_size) {
 
@@ -93,7 +93,7 @@ namespace rlu::replay_buffer {
         return idx;
     }
 
-    PrioritizedReplayBuffer::PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+    PrioritizedReplayBuffer::PrioritizedReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec,
                                                      int64_t batch_size, float alpha, const std::string &segment_tree)
             : ReplayBuffer(capacity, data_spec, batch_size),
               m_alpha(alpha),
@@ -142,7 +142,7 @@ namespace rlu::replay_buffer {
         this->add_batch(data, priorities);
     }
 
-    void PrioritizedReplayBuffer::add_batch(const ReplayBuffer::str_to_tensor &data, const torch::Tensor &priorities) {
+    void PrioritizedReplayBuffer::add_batch(const str_to_tensor &data, const torch::Tensor &priorities) {
         int64_t batch_size = data.begin()->second.sizes()[0];
         if (m_ptr + batch_size > capacity()) {
             std::cout << "Reaches the end of the replay buffer" << std::endl;

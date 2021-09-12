@@ -11,25 +11,14 @@
 #include <vector>
 #include "fmt/format.h"
 #include "segment_tree.h"
+#include "type.h"
 
 using namespace torch::indexing;
 
 namespace rlu::replay_buffer {
 
-    struct DataSpec {
-        torch::Dtype m_dtype;
-        std::vector<int64_t> m_shape;
-
-        DataSpec(std::vector<int64_t> shape, torch::Dtype dtype) : m_dtype(dtype), m_shape(std::move(shape)) {
-
-        }
-    };
-
     class ReplayBuffer {
     public:
-        typedef std::map<std::string, torch::Tensor> str_to_tensor;
-        typedef std::map<std::string, DataSpec> str_to_dataspec;
-
         explicit ReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec, int64_t batch_size);
 
         // pure virtual function
@@ -62,8 +51,7 @@ namespace rlu::replay_buffer {
 
     class UniformReplayBuffer final : public ReplayBuffer {
     public:
-        explicit UniformReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
-                                     int64_t batch_size);
+        explicit UniformReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec, int64_t batch_size);
 
         [[nodiscard]] torch::Tensor generate_idx() const override;
 
@@ -73,7 +61,7 @@ namespace rlu::replay_buffer {
 
     class PrioritizedReplayBuffer final : public ReplayBuffer {
     public:
-        explicit PrioritizedReplayBuffer(int64_t capacity, const std::map<std::string, DataSpec> &data_spec,
+        explicit PrioritizedReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec,
                                          int64_t batch_size, float alpha, const std::string &segment_tree = "cpp");
 
         [[nodiscard]] torch::Tensor generate_idx() const override;
