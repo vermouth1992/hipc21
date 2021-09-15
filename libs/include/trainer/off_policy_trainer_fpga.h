@@ -50,6 +50,27 @@ namespace rlu::trainer {
         void setup_replay_buffer(int64_t replay_size, int64_t batch_size) override {
             // must using the FPGA based replay buffer, where the subtree is on the FPGA and the data is stored
             // in the CPU memory
+            std::unique_ptr<DataSpec> action_data_spec;
+            auto action_space = env->action_space();
+            auto observation_space = env->observation_space();
+            if (action_space->type == action_space->DISCRETE) {
+                action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
+            } else {
+                action_data_spec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
+            }
+            // setup agent
+            agent->to(device);
+            // setup replay buffer
+            str_to_dataspec data_spec{
+                    {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
+                    {"act",      *action_data_spec},
+                    {"next_obs", DataSpec(observation_space->box_shape, torch::kFloat32)},
+                    {"rew",      DataSpec({}, torch::kFloat32)},
+                    {"done",     DataSpec({}, torch::kFloat32)},
+            };
+
+            this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer>(
+                    replay_size, data_spec, batch_size, 0.8, "fpga");
         }
 
 

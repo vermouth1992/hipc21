@@ -32,6 +32,8 @@ namespace rlu::trainer {
                                   torch::Device device,
                                   int64_t seed);
 
+        virtual ~OffPolicyTrainer() = default;
+
         void setup_logger(std::optional<std::string> exp_name, const std::string &data_dir);
 
         virtual void setup_replay_buffer(int64_t replay_size, int64_t batch_size);
@@ -64,6 +66,8 @@ namespace rlu::trainer {
         int64_t num_updates{};
         Gym::State s;
         rlu::watcher::StopWatcher watcher;
+
+        void set_default_exp_name(std::optional<std::string> &exp_name);
 
         void test_step(const std::shared_ptr<agent::OffPolicyAgent> &test_actor);
 

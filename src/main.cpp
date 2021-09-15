@@ -2,20 +2,19 @@
 // Created by chi on 7/2/21.
 //
 
-#define FMT_HEADER_ONLY
 
-#include "agent/dqn.h"
-#include "agent/td3.h"
-#include "trainer/off_policy_trainer.h"
+#include "agent/agent.h"
+#include "trainer/trainer.h"
 #include "cxxopts.hpp"
 
 static cxxopts::ParseResult parse(int argc, char *argv[]) {
     try {
-        cxxopts::Options options(argv[0], " - Training DQN agents");
+        cxxopts::Options options(argv[0], " - Training Off-policy agents");
         options.positional_help("[optional args]").show_positional_help();
         options.allow_unrecognised_options().add_options()
                 ("help", "Print help")
                 ("env_id", "Environment id", cxxopts::value<std::string>())
+                ("algorithm", "Algorithm", cxxopts::value<std::string>())
                 ("epochs", "Number of epochs", cxxopts::value<int64_t>()->default_value("100"))
                 ("steps_per_epoch", "Number steps/epoch", cxxopts::value<int64_t>()->default_value("1000"))
                 ("start_steps", "Number of steps that take random actions",
@@ -33,7 +32,10 @@ static cxxopts::ParseResult parse(int argc, char *argv[]) {
                 ("seed", "Random seed", cxxopts::value<int64_t>()->default_value("1"))
                 ("replay_size", "Size of the replay buffer",
                  cxxopts::value<int64_t>()->default_value("1000000"))
-                ("device", "Pytorch device", cxxopts::value<std::string>()->default_value("cpu"));
+                ("device", "Pytorch device", cxxopts::value<std::string>()->default_value("cpu"))
+                ("num_actors", "Number of actors", cxxopts::value<int64_t>()->default_value("0"))
+                ("num_learners", "Number of learners", cxxopts::value<int64_t>()->default_value("0"))
+                ("bitstream", "Path to the bitstream", cxxopts::value<std::string>()->default_value(" "));
 
         auto result = options.parse(argc, argv);
 
@@ -71,56 +73,90 @@ create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
 }
 
 int main(int argc, char **argv) {
-    // remove the second argv
-    if (argc < 2) throw std::runtime_error("Must specify the algorithm");
-    std::string algorithm(argv[1]);
-    char **real_argv = new char *[argc - 1];
-    real_argv[0] = argv[0];
-    for (int i = 2; i < argc; i++) {
-        real_argv[i - 1] = argv[i];
-    }
-
     try {
-        auto result = parse(argc - 1, real_argv);
+        auto result = parse(argc, argv);
+        torch::manual_seed(result["seed"].as<int64_t>());
         // device name
-        std::string device_name = result["device"].as<std::string>();
-        auto device = rlu::ptu::get_torch_device(device_name);
+        std::string algorithm(result["algorithm"].as<std::string>());
+        std::string device_name(result["device"].as<std::string>());
         std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
         std::string env_id = result["env_id"].as<std::string>();
-        std::shared_ptr<Gym::Environment> env = client->make(env_id);
 
+        int64_t num_actors = result["num_actors"].as<int64_t>();
+        int64_t num_learners = result["num_learners"].as<int64_t>();
+
+        // get environment function
         std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&client, &env_id]() {
             return client->make(env_id);
         };
 
+        // get agent function
         std::function<std::shared_ptr<rlu::agent::OffPolicyAgent>()> agent_fn = [&env_fn, &algorithm]() {
             return create_agent(env_fn, algorithm);
         };
 
-        rlu::trainer::OffPolicyTrainer trainer(env_fn,
-                                               agent_fn,
-                                               result["epochs"].as<int64_t>(),
-                                               result["steps_per_epoch"].as<int64_t>(),
-                                               result["start_steps"].as<int64_t>(),
-                                               result["update_after"].as<int64_t>(),
-                                               result["update_every"].as<int64_t>(),
-                                               result["update_per_step"].as<int64_t>(),
-                                               result["policy_delay"].as<int64_t>(),
-                                               result["num_test_episodes"].as<int64_t>(),
-                                               device,
-                                               result["seed"].as<int64_t>()
-        );
+        std::shared_ptr<rlu::trainer::OffPolicyTrainer> trainer;
 
-        trainer.setup_logger(std::nullopt, "data");
-        trainer.setup_replay_buffer(result["replay_size"].as<int64_t>(), result["batch_size"].as<int64_t>());
-        trainer.train();
+        if (num_actors <= 0 || num_learners <= 0) {
+            auto device = rlu::ptu::get_torch_device(device_name);
+            trainer = std::make_shared<rlu::trainer::OffPolicyTrainer>(env_fn,
+                                                                       agent_fn,
+                                                                       result["epochs"].as<int64_t>(),
+                                                                       result["steps_per_epoch"].as<int64_t>(),
+                                                                       result["start_steps"].as<int64_t>(),
+                                                                       result["update_after"].as<int64_t>(),
+                                                                       result["update_every"].as<int64_t>(),
+                                                                       result["update_per_step"].as<int64_t>(),
+                                                                       result["policy_delay"].as<int64_t>(),
+                                                                       result["num_test_episodes"].as<int64_t>(),
+                                                                       device,
+                                                                       result["seed"].as<int64_t>());
+        } else if (device_name == "cpu" || device_name == "gpu") {
+            auto device = rlu::ptu::get_torch_device(device_name);
+            trainer = std::make_shared<rlu::trainer::OffPolicyTrainerParallel>(
+                    env_fn,
+                    agent_fn,
+                    result["epochs"].as<int64_t>(),
+                    result["steps_per_epoch"].as<int64_t>(),
+                    result["start_steps"].as<int64_t>(),
+                    result["update_after"].as<int64_t>(),
+                    result["update_every"].as<int64_t>(),
+                    result["update_per_step"].as<int64_t>(),
+                    result["policy_delay"].as<int64_t>(),
+                    result["num_test_episodes"].as<int64_t>(),
+                    device,
+                    result["seed"].as<int64_t>(),
+                    num_actors,
+                    num_learners);
+        } else if (device_name == "fpga") {
+            // fpga trainer
+            trainer = std::make_shared<rlu::trainer::OffPolicyTrainerFPGA>(
+                    env_fn,
+                    agent_fn,
+                    result["epochs"].as<int64_t>(),
+                    result["steps_per_epoch"].as<int64_t>(),
+                    result["start_steps"].as<int64_t>(),
+                    result["update_after"].as<int64_t>(),
+                    result["update_every"].as<int64_t>(),
+                    result["update_per_step"].as<int64_t>(),
+                    result["policy_delay"].as<int64_t>(),
+                    result["num_test_episodes"].as<int64_t>(),
+                    result["seed"].as<int64_t>(),
+                    num_actors,
+                    result["bitstream"].as<std::string>()
+            );
+        } else {
+            throw std::runtime_error(fmt::format("Unknown device name {}", device_name));
+        }
+
+        trainer->setup_logger(std::nullopt, "data");
+        trainer->setup_replay_buffer(result["replay_size"].as<int64_t>(), result["batch_size"].as<int64_t>());
+        trainer->train();
 
     } catch (const std::exception &e) {
         fprintf(stderr, "ERROR: %s\n", e.what());
         return 1;
     }
-
-    delete[]real_argv;
 
     return 0;
 }

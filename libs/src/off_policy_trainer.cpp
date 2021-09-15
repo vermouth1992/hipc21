@@ -33,10 +33,7 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::setup_logger(std::optional<std::string> exp_name, const std::string &data_dir) {
         // setup logger
-        if (exp_name == std::nullopt) {
-            auto &r = *agent;
-            exp_name.emplace(env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
-        }
+        set_default_exp_name(exp_name);
         auto output_dir = rlu::logger::setup_logger_kwargs(exp_name.value(), seed, data_dir);
         logger = std::make_shared<rlu::logger::EpochLogger>(output_dir, exp_name.value());
         agent->set_logger(logger);
@@ -51,8 +48,6 @@ namespace rlu::trainer {
         } else {
             action_data_spec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
         }
-        // setup agent
-        agent->to(device);
         // setup replay buffer
         str_to_dataspec data_spec{
                 {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
@@ -66,7 +61,8 @@ namespace rlu::trainer {
     }
 
     void OffPolicyTrainer::train() {
-        torch::manual_seed(seed);
+        // setup agent
+        agent->to(device);
         watcher.start();
         env->reset(&s);
 
@@ -189,6 +185,13 @@ namespace rlu::trainer {
         episode_rewards = 0;
         episode_length = 0;
         num_updates = 0;
+    }
+
+    void OffPolicyTrainer::set_default_exp_name(std::optional<std::string> &exp_name) {
+        if (exp_name == std::nullopt) {
+            auto &r = *agent;
+            exp_name.emplace(env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
+        }
     }
 
 }
