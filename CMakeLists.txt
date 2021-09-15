@@ -27,7 +27,7 @@ link_directories(${CONDA_PATH}/lib)
 add_subdirectory(Google_tests)
 add_subdirectory(libs)
 add_subdirectory(envs)
-add_subdirectory(binding)
+#add_subdirectory(binding)
 
 set(SOURCE_FILES
         src/main.cpp

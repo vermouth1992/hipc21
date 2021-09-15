@@ -5,6 +5,8 @@
 #ifndef HIPC21_LOGGER_H
 #define HIPC21_LOGGER_H
 
+#define FMT_HEADER_ONLY
+
 #include <string>
 #include <fstream>
 #include <filesystem>
