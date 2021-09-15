@@ -143,6 +143,11 @@ namespace rlu::trainer {
                                                  torch::TensorOptions().dtype(torch::kFloat32));
 
                 // store the data in a temporary buffer and wait for every batch size to store together
+                // step 1: secure an index. If can't, wait in the conditional variable
+
+                // step 2: add data to the index without lock
+
+                // step 3: if the temporary buffer is full, compute priority and add to the replay buffer
 
                 // compute the priority
 

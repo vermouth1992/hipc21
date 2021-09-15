@@ -65,7 +65,7 @@ namespace rlu::agent {
         m_logger->log_tabular("LossQ", std::nullopt, false, true);
     }
 
-    OffPolicyAgent::str_to_tensor
+    str_to_tensor
     TD3Agent::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
                          const torch::Tensor &rew, const torch::Tensor &done,
                          const std::optional<torch::Tensor> &importance_weights, bool update_target) {
