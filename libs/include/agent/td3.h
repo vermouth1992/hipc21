@@ -39,6 +39,21 @@ namespace rlu::agent {
 
         torch::Tensor act_single(const torch::Tensor &obs, bool exploration) override;
 
+        void set_grad(const str_to_tensor_list &grads) override {
+
+        }
+
+        str_to_tensor_list
+        compute_grad(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                     const torch::Tensor &rew, const torch::Tensor &done,
+                     const std::optional<torch::Tensor> &importance_weights, bool update_target) override {
+            return {};
+        }
+
+        void update_step(bool update_target) override {
+            
+        }
+
     private:
         const float actor_noise;
         const float target_noise;

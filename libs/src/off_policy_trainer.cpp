@@ -43,13 +43,13 @@ namespace rlu::trainer {
     }
 
     void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
-        std::unique_ptr<rlu::replay_buffer::DataSpec> action_data_spec;
+        std::unique_ptr<DataSpec> action_data_spec;
         auto action_space = env->action_space();
         auto observation_space = env->observation_space();
         if (action_space->type == action_space->DISCRETE) {
-            action_data_spec = std::make_unique<rlu::replay_buffer::DataSpec>(std::vector<int64_t>(), torch::kInt64);
+            action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
         } else {
-            action_data_spec = std::make_unique<rlu::replay_buffer::DataSpec>(action_space->box_shape, torch::kFloat32);
+            action_data_spec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
         }
         // setup agent
         agent->to(device);
