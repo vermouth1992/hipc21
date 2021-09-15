@@ -3,15 +3,12 @@ project(hipc21)
 
 set(CMAKE_CXX_STANDARD 20)
 
-if (APPLE)
-    set(CONDA_PATH $ENV{HOME}/miniforge3)
-else ()
-    set(CONDA_PATH $ENV{HOME}/miniconda3)
-endif (APPLE)
-
 find_package(Python COMPONENTS Interpreter Development)
 include_directories(${PYTHON_INCLUDE_DIRS})
+# assume the anaconda path is two directories above the python executable
+get_filename_component(CONDA_PATH ${Python_EXECUTABLE}/../../ ABSOLUTE)
 
+message(STATUS "anaconda path ${CONDA_PATH}")
 message(STATUS "Found Python site-package library at ${Python_SITELIB}")
 
 set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
