@@ -54,12 +54,12 @@ namespace rlu::trainer {
         // setup agent
         agent->to(device);
         // setup replay buffer
-        rlu::replay_buffer::ReplayBuffer::str_to_dataspec data_spec{
-                {"obs",      rlu::replay_buffer::DataSpec(observation_space->box_shape, torch::kFloat32)},
+        str_to_dataspec data_spec{
+                {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
                 {"act",      *action_data_spec},
-                {"next_obs", rlu::replay_buffer::DataSpec(observation_space->box_shape, torch::kFloat32)},
-                {"rew",      rlu::replay_buffer::DataSpec({}, torch::kFloat32)},
-                {"done",     rlu::replay_buffer::DataSpec({}, torch::kFloat32)},
+                {"next_obs", DataSpec(observation_space->box_shape, torch::kFloat32)},
+                {"rew",      DataSpec({}, torch::kFloat32)},
+                {"done",     DataSpec({}, torch::kFloat32)},
         };
 
         this->buffer = std::make_shared<rlu::replay_buffer::UniformReplayBuffer>(replay_size, data_spec, batch_size);
