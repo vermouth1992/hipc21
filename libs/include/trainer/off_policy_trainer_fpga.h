@@ -51,8 +51,8 @@ namespace rlu::trainer {
             // must using the FPGA based replay buffer, where the subtree is on the FPGA and the data is stored
             // in the CPU memory
             std::unique_ptr<DataSpec> action_data_spec;
-            auto action_space = env->action_space();
-            auto observation_space = env->observation_space();
+            auto action_space = test_env->action_space();
+            auto observation_space = test_env->observation_space();
             if (action_space->type == action_space->DISCRETE) {
                 action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
             } else {
@@ -75,6 +75,15 @@ namespace rlu::trainer {
 
 
     protected:
+        static void *learner_fn(void *param_) {
+            auto param = (std::pair<OffPolicyTrainerFPGA *, size_t> *) param_;
+            OffPolicyTrainerFPGA *This = param->first;
+            size_t index = param->second;
+            MSG("Running learner thread " << pthread_self());
+            This->learner_fn_internal(index);
+            return nullptr;
+        }
+
         void learner_fn_internal(size_t index) override {
             // we assume there is only one learner here.
             int64_t max_global_steps = epochs * steps_per_epoch;
@@ -84,21 +93,20 @@ namespace rlu::trainer {
                 if (global_steps_temp >= max_global_steps) {
                     break;
                 }
+                if (global_steps_temp >= update_after) {
+                    // step 1: query FPGA about idx
+                    auto idx = buffer->generate_idx();
+                    // retrieve the actual data
+                    auto data = buffer->operator[](idx);
+                    // send the data to the FPGA and waits for the FPGA to complete and send back logging data including
+                    // the QVals (batch) and the loss of Q (scalar)
 
-                // step 1: query FPGA about idx
-                auto idx = buffer->generate_idx();
-                // retrieve the actual data
-                auto data = buffer->operator[](idx);
-                // send the data to the FPGA and waits for the FPGA to complete and send back logging data including
-                // the QVals (batch) and the loss of Q (scalar)
+                    // increase the number of gradient steps
 
-                // increase the number of gradient steps
-
-                // copy the weights from FPGA to the CPU
-                synchronize_weights();
+                    // copy the weights from FPGA to the CPU
+                    synchronize_weights();
+                }
             }
-
-
         }
 
     private:

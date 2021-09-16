@@ -79,14 +79,17 @@ int main(int argc, char **argv) {
         // device name
         std::string algorithm(result["algorithm"].as<std::string>());
         std::string device_name(result["device"].as<std::string>());
-        std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
         std::string env_id = result["env_id"].as<std::string>();
 
         int64_t num_actors = result["num_actors"].as<int64_t>();
         int64_t num_learners = result["num_learners"].as<int64_t>();
 
+        int port = 5000;
+
         // get environment function
-        std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&client, &env_id]() {
+        std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&port, &env_id]() {
+            std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", port);
+            port += 1;
             return client->make(env_id);
         };
 
@@ -149,6 +152,7 @@ int main(int argc, char **argv) {
             throw std::runtime_error(fmt::format("Unknown device name {}", device_name));
         }
 
+        trainer->setup_environment();
         trainer->setup_logger(std::nullopt, "data");
         trainer->setup_replay_buffer(result["replay_size"].as<int64_t>(), result["batch_size"].as<int64_t>());
         trainer->train();

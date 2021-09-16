@@ -3,20 +3,22 @@
 //
 
 #include "trainer/off_policy_trainer.h"
+
+#include <utility>
 #include "nameof.hpp"
 
 namespace rlu::trainer {
 
-    OffPolicyTrainer::OffPolicyTrainer(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+    OffPolicyTrainer::OffPolicyTrainer(std::function<std::shared_ptr<Gym::Environment>()> env_fn,
                                        const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                        int64_t epochs, int64_t steps_per_epoch,
                                        int64_t start_steps, int64_t update_after, int64_t update_every,
                                        int64_t update_per_step, int64_t policy_delay, int64_t num_test_episodes,
                                        torch::Device device, int64_t seed) :
-            env_fn(env_fn),
+            env_fn(std::move(env_fn)),
             agent_fn(agent_fn),
-            env(env_fn()),
-            test_env(env_fn()),
+            env(nullptr),
+            test_env(nullptr),
             agent(agent_fn()),
             epochs(epochs),
             steps_per_epoch(steps_per_epoch),
@@ -190,8 +192,14 @@ namespace rlu::trainer {
     void OffPolicyTrainer::set_default_exp_name(std::optional<std::string> &exp_name) {
         if (exp_name == std::nullopt) {
             auto &r = *agent;
-            exp_name.emplace(env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
+            exp_name.emplace(test_env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
         }
+    }
+
+    void OffPolicyTrainer::setup_environment() {
+        // setup env on demand on that child class won't instantiate idle env
+        this->env = env_fn();
+        this->test_env = env_fn();
     }
 
 }

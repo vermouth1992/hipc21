@@ -263,9 +263,6 @@ namespace rlu::logger {
     void EpochLogger::dump_tabular() {
         pthread_mutex_lock(&mutex);
         Logger::dump_tabular();
-        for (const auto &it: m_epoch_dict) {
-            M_Assert(it.second.empty(), fmt::format("Key {} is not called using log_tabular\n", it.first).c_str());
-        }
         pthread_mutex_unlock(&mutex);
     }
 }
