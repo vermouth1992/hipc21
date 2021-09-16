@@ -86,9 +86,9 @@ namespace rlu::trainer {
                 }
 
                 // step 1: query FPGA about idx
-                auto idx = buffer->generate_idx();
+//                auto idx = buffer->generate_idx();
                 // retrieve the actual data
-                auto data = buffer->operator[](idx);
+//                auto data = buffer->operator[](idx);
                 // send the data to the FPGA and waits for the FPGA to complete and send back logging data including
                 // the QVals (batch) and the loss of Q (scalar)
 

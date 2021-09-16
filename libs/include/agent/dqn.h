@@ -23,7 +23,7 @@ namespace rlu::agent {
     public:
         explicit DQN(const Gym::Space &obs_space,
                      const Gym::Space &act_space,
-                     int64_t mlp_hidden = 128,
+                     int64_t mlp_hidden = 64,
                      float q_lr = 1e-3,
                      float gamma = 0.99,
                      float tau = 5e-3,

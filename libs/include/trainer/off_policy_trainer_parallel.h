@@ -42,8 +42,7 @@ namespace rlu::trainer {
                         device,
                         seed
                 ),
-                actor(agent_fn()),
-                test_actor(agent_fn()) {
+                actor(agent_fn()) {
             for (int i = 0; i < num_actors; i++) {
                 envs.push_back(env_fn());
                 actor_mutexes.emplace_back();
@@ -113,7 +112,14 @@ namespace rlu::trainer {
                 int64_t global_steps_temp = this->get_global_steps(true);
                 // create a new thread for testing and logging
                 if (global_steps_temp % steps_per_epoch == 0) {
-                    this->start_tester_thread({
+                    // create a new agent. Copy the weights from the current learner
+                    std::shared_ptr<agent::OffPolicyAgent> test_actor = agent_fn();
+                    pthread_mutex_lock(&test_actor_mutex);
+                    rlu::functional::hard_update(*test_actor, *actor);
+                    pthread_mutex_unlock(&test_actor_mutex);
+
+                    this->start_tester_thread(test_actor,
+                                              {
                                                       {"epoch", global_steps_temp / steps_per_epoch}
                                               });
                 }
@@ -218,8 +224,10 @@ namespace rlu::trainer {
                     }
                     // TODO: need to optimize for PCIe transfer. First transfer to a CPU agent.
                     // Then, perform atomic weight copy
+                    pthread_mutex_lock(&test_actor_mutex);
                     rlu::functional::hard_update(*actor, *agent);
-                    rlu::functional::hard_update(*test_actor, *agent);
+                    pthread_mutex_unlock(&test_actor_mutex);
+
                     for (auto &m: actor_mutexes) {
                         pthread_mutex_unlock(&m);
                     }
@@ -235,29 +243,33 @@ namespace rlu::trainer {
             }
         }
 
-        virtual void tester_fn_internal(const std::unordered_map<std::string, float> &param_) {
-            // test the current policy
-            for (int i = 0; i < num_test_episodes; ++i) {
-                test_step(this->test_actor);
-            }
-            // logging
-            watcher.lap();
-
+        virtual void tester_fn_internal(const std::shared_ptr<agent::OffPolicyAgent> &test_actor,
+                                        const std::unordered_map<std::string, float> &param_) {
             // perform logging
             logger->log_tabular("Epoch", param_.at("epoch"));
             logger->log_tabular("EpRet", std::nullopt, true);
             logger->log_tabular("EpLen", std::nullopt, false, true);
             logger->log_tabular("TotalEnvInteracts", (float) total_steps);
+            agent->log_tabular();
+
+            // test the current policy
+            for (int i = 0; i < num_test_episodes; ++i) {
+                test_step(test_actor);
+            }
+            // logging
+            watcher.lap();
+
             logger->log_tabular("TestEpRet", std::nullopt, true);
             logger->log_tabular("TestEpLen", std::nullopt, false, true);
-            agent->log_tabular();
             logger->log_tabular("Time", (float) watcher.seconds());
+
             logger->dump_tabular();
         }
 
-        void start_tester_thread(const std::unordered_map<std::string, float> &param_) {
-            auto param = std::make_shared<std::pair<OffPolicyTrainerParallel *,
-                    std::unordered_map<std::string, float>>>(this, param_);
+        void start_tester_thread(const std::shared_ptr<agent::OffPolicyAgent> &test_actor,
+                                 const std::unordered_map<std::string, float> &param_) {
+            auto param = std::make_shared<std::tuple<OffPolicyTrainerParallel *, std::unordered_map<std::string, float>,
+                    std::shared_ptr<agent::OffPolicyAgent>>>(this, param_, test_actor);
             int ret = pthread_create(&tester_thread, nullptr, &tester_fn, param.get());
             if (ret != 0) {
                 MSG("Fail to create tester thread with error code " << ret);
@@ -288,7 +300,6 @@ namespace rlu::trainer {
 
         // agents
         const std::shared_ptr<agent::OffPolicyAgent> actor;
-        const std::shared_ptr<agent::OffPolicyAgent> test_actor;
         // threads
         std::vector<pthread_t> actor_threads;
         std::vector<pthread_t> learner_threads;
@@ -326,9 +337,10 @@ namespace rlu::trainer {
         }
 
         static void *tester_fn(void *param_) {
-            auto param = (std::pair<OffPolicyTrainerParallel *, std::unordered_map<std::string, float>> *) param_;
-            OffPolicyTrainerParallel *This = param->first;
-            ((OffPolicyTrainerParallel *) This)->tester_fn_internal(param->second);
+            auto param = (std::tuple<OffPolicyTrainerParallel *, std::unordered_map<std::string, float>, std::shared_ptr<agent::OffPolicyAgent> > *) param_;
+            OffPolicyTrainerParallel *This = std::get<0>(*param);
+            ((OffPolicyTrainerParallel *) This)->tester_fn_internal(std::get<2>(*param),
+                                                                    std::get<1>(*param));
             return nullptr;
         }
 

@@ -18,9 +18,9 @@ namespace rlu::agent {
         if (obs_space.box_shape.size() == 1) {
             int64_t obs_dim = obs_space.box_shape[0];
             int64_t act_dim = act_space.discreet_n;
-            this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
+            this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, 2));
             this->target_q_network = register_module("target_q_network",
-                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
+                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, 2));
         } else {
             throw std::runtime_error("Unsupported observation space.");
         }
