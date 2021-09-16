@@ -48,7 +48,7 @@ namespace rlu::replay_buffer {
         void set(const torch::Tensor &idx, const torch::Tensor &value) override {
             // TODO: set the priority of idx to value on the FPGA. This function must be implemented
             // tensor shape: one dimension array idx: M, value M
-            throw NotImplemented();
+//            throw NotImplemented();
         }
 
         [[nodiscard]] float reduce(int64_t start, int64_t end) const override {
@@ -65,7 +65,7 @@ namespace rlu::replay_buffer {
 
         [[nodiscard]] torch::Tensor sample_idx(int64_t batch_size) const override {
             // TODO: this function must be implemented
-            throw NotImplemented();
+            return torch::zeros({batch_size}, torch::TensorOptions().dtype(torch::kInt64));
         }
 
     };
