@@ -6,8 +6,6 @@
 - nlohmann_json
 
 ```bash
-conda install curl pybind11
-conda install -c conda-forge nlohmann_json spdlog fmt
-conda install -c conda-forge cudatoolkit-dev
+conda install nlohmann_json spdlog fmt curl pybind11 cudatoolkit-dev==11.1.1 -c conda-forge
 conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c nvidia
 ```
