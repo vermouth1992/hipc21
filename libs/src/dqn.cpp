@@ -18,9 +18,9 @@ namespace rlu::agent {
         if (obs_space.box_shape.size() == 1) {
             int64_t obs_dim = obs_space.box_shape[0];
             int64_t act_dim = act_space.discreet_n;
-            this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, 2));
+            this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
             this->target_q_network = register_module("target_q_network",
-                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, 2));
+                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
         } else {
             throw std::runtime_error("Unsupported observation space.");
         }
@@ -36,28 +36,37 @@ namespace rlu::agent {
 
         // compute target values
         torch::Tensor target_q_values = this->compute_next_obs_q(next_obs, rew, done);
+        spdlog::debug("After computing target_q_values");
         q_optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs);
+        spdlog::debug("After forward");
         q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1); // (None,)
         auto loss = torch::square(q_values - target_q_values); // (None,)
         if (importance_weights != std::nullopt) {
             loss = loss * importance_weights.value();
         }
         loss = torch::mean(loss);
+        spdlog::debug("After computing loss");
         loss.backward();
+        spdlog::debug("After loss backward");
         q_optimizer->step();
+        spdlog::debug("After optimizer step");
 
         if (update_target) {
             this->update_target_q(true);
         }
+
+        spdlog::debug("After target update");
 
         str_to_tensor log_data{
                 {"abs_delta_q", torch::abs(q_values - target_q_values).detach()}
         };
 
         // logging
-        m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector<float>(q_values));
+        m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector<float>(q_values.cpu()));
         m_logger->store("LossQ", loss.item<float>());
+
+        spdlog::debug("After logging");
 
         return log_data;
     }

@@ -35,6 +35,7 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::setup_logger(std::optional<std::string> exp_name, const std::string &data_dir) {
         // setup logger
+        spdlog::info("Setting up the logger");
         set_default_exp_name(exp_name);
         auto output_dir = rlu::logger::setup_logger_kwargs(exp_name.value(), seed, data_dir);
         logger = std::make_shared<rlu::logger::EpochLogger>(output_dir, exp_name.value());
@@ -42,6 +43,7 @@ namespace rlu::trainer {
     }
 
     void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
+        spdlog::info("Setting up the replay buffer");
         std::unique_ptr<DataSpec> action_data_spec;
         auto action_space = env->action_space();
         auto observation_space = env->observation_space();
@@ -70,6 +72,8 @@ namespace rlu::trainer {
 
         this->reset();
 
+        spdlog::info("Start training");
+
         for (int epoch = 1; epoch <= epochs; epoch++) {
             for (int step = 0; step < steps_per_epoch; step++) {
                 train_step();
@@ -77,9 +81,11 @@ namespace rlu::trainer {
             }
 
             // test the current policy
+            spdlog::debug("Start testing");
             for (int i = 0; i < num_test_episodes; ++i) {
                 test_step(this->agent);
             }
+            spdlog::debug("Finish testing");
 
             watcher.lap();
 
@@ -119,13 +125,17 @@ namespace rlu::trainer {
         // copy observation
         auto current_obs = s.observation;
         if (total_steps < start_steps) {
+            spdlog::debug("Sample random actions");
             action = env->action_space()->sample();
         } else {
+            spdlog::debug("Start using agent action");
             action = agent->act_single(current_obs.to(device), true).to(cpu);
         }
 
+        spdlog::debug("Before step");
         // environment step
         env->step(action, false, &s);
+        spdlog::debug("After step");
 
         // TODO: need to see if it is true done or done due to reaching the maximum length.
         // convert data type
@@ -145,6 +155,8 @@ namespace rlu::trainer {
                                    {"done",     done_tensor}
                            });
 
+        spdlog::debug("After buffer adding");
+
         episode_rewards += s.reward;
         episode_length += 1;
         // handle terminal case
@@ -153,7 +165,7 @@ namespace rlu::trainer {
                                   {"EpRet", std::vector<float>{episode_rewards}},
                                   {"EpLen", std::vector<float>{(float) episode_length}}
                           });
-
+            spdlog::debug("Finish episode");
             env->reset(&s);
             episode_rewards = 0.;
             episode_length = 0;
@@ -164,10 +176,13 @@ namespace rlu::trainer {
             if (total_steps % update_every == 0) {
                 for (int i = 0; i < update_every * update_per_step; i++) {
                     // generate index
+                    spdlog::debug("Generating index");
                     auto idx = buffer->generate_idx();
                     // retrieve the actual data
+                    spdlog::debug("Gathering data");
                     auto data = buffer->operator[](idx);
                     // training
+                    spdlog::debug("Agent training");
                     agent->train_step(data["obs"].to(device),
                                       data["act"].to(device),
                                       data["next_obs"].to(device),
@@ -175,6 +190,7 @@ namespace rlu::trainer {
                                       data["done"].to(device),
                                       std::nullopt,
                                       num_updates % policy_delay == 0);
+                    spdlog::debug("After agent training");
                     num_updates += 1;
                 }
             }
@@ -198,6 +214,7 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::setup_environment() {
         // setup env on demand on that child class won't instantiate idle env
+        spdlog::info("Setting up the environment");
         this->env = env_fn();
         this->test_env = env_fn();
     }

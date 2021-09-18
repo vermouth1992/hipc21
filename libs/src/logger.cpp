@@ -94,15 +94,15 @@ namespace rlu::logger {
             m_first_row(true),
             m_exp_name(std::move(exp_name)) {
         if (!output_dir.empty()) {
-            if (fs::exists(output_dir)) {
-                std::cout << "Warning: Log dir " << output_dir << " already exists! Storing info there anyway."
-                          << std::endl;
-            } else {
-                fs::create_directories(output_dir);
-            }
             const std::string file_name = fs::path(output_dir) / output_fname;
             m_output_file.open(file_name, std::fstream::out);
-            printf("%s", colorize("Logging data to " + file_name + "\n", "green").c_str());
+            if (fs::exists(output_dir)) {
+                spdlog::warn("Log dir {} already exists! Storing info there anyway.", output_dir);
+            } else {
+                spdlog::info("Logging data to " + file_name);
+                fs::create_directories(output_dir);
+            }
+
         }
     }
 

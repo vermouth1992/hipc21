@@ -20,6 +20,7 @@
 #include "common.h"
 #include "fmt/format.h"
 #include "fmt/compile.h"
+#include "spdlog/spdlog.h"
 
 
 namespace rlu::logger {

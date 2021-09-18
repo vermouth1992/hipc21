@@ -6,6 +6,7 @@
 #include "agent/agent.h"
 #include "trainer/trainer.h"
 #include "cxxopts.hpp"
+#include "spdlog/spdlog.h"
 
 static cxxopts::ParseResult parse(int argc, char *argv[]) {
     try {
@@ -35,7 +36,8 @@ static cxxopts::ParseResult parse(int argc, char *argv[]) {
                 ("device", "Pytorch device", cxxopts::value<std::string>()->default_value("cpu"))
                 ("num_actors", "Number of actors", cxxopts::value<int64_t>()->default_value("0"))
                 ("num_learners", "Number of learners", cxxopts::value<int64_t>()->default_value("0"))
-                ("bitstream", "Path to the bitstream", cxxopts::value<std::string>()->default_value(" "));
+                ("bitstream", "Path to the bitstream", cxxopts::value<std::string>()->default_value(" "))
+                ("logging_level", "Logging level", cxxopts::value<int>()->default_value("2"));
 
         auto result = options.parse(argc, argv);
 
@@ -75,6 +77,8 @@ create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
 int main(int argc, char **argv) {
     try {
         auto result = parse(argc, argv);
+        int logging_level = result["logging_level"].as<int>();
+        spdlog::set_level(static_cast<spdlog::level::level_enum>(logging_level));
         torch::manual_seed(result["seed"].as<int64_t>());
         // device name
         std::string algorithm(result["algorithm"].as<std::string>());
@@ -101,6 +105,7 @@ int main(int argc, char **argv) {
         std::shared_ptr<rlu::trainer::OffPolicyTrainer> trainer;
 
         if (num_actors <= 0 || num_learners <= 0) {
+            spdlog::info("Running sequential trainer");
             auto device = rlu::ptu::get_torch_device(device_name);
             trainer = std::make_shared<rlu::trainer::OffPolicyTrainer>(env_fn,
                                                                        agent_fn,
@@ -115,6 +120,7 @@ int main(int argc, char **argv) {
                                                                        device,
                                                                        result["seed"].as<int64_t>());
         } else if (device_name == "cpu" || device_name == "gpu") {
+            spdlog::info("Running parallel trainer");
             auto device = rlu::ptu::get_torch_device(device_name);
             trainer = std::make_shared<rlu::trainer::OffPolicyTrainerParallel>(
                     env_fn,
@@ -132,6 +138,7 @@ int main(int argc, char **argv) {
                     num_actors,
                     num_learners);
         } else if (device_name == "fpga") {
+            spdlog::info("Running fpga trainer");
             // fpga trainer
             trainer = std::make_shared<rlu::trainer::OffPolicyTrainerFPGA>(
                     env_fn,
