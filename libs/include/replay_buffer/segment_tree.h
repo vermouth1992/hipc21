@@ -41,7 +41,7 @@ namespace rlu::replay_buffer {
         }
 
         // query the FPGA about the weights in the segment tree
-        torch::Tensor operator[](const torch::Tensor &idx) const override {
+        torch::Tensor operator[](__attribute__ ((unused)) const torch::Tensor &idx) const override {
             throw NotImplemented();
         }
 
@@ -51,7 +51,8 @@ namespace rlu::replay_buffer {
 //            throw NotImplemented();
         }
 
-        [[nodiscard]] float reduce(int64_t start, int64_t end) const override {
+        [[nodiscard]] float reduce(__attribute__ ((unused)) int64_t start,
+                                   __attribute__ ((unused)) int64_t end) const override {
             throw NotImplemented();
         }
 
@@ -59,7 +60,7 @@ namespace rlu::replay_buffer {
             throw NotImplemented();
         }
 
-        [[nodiscard]] torch::Tensor get_prefix_sum_idx(torch::Tensor value) const override {
+        [[nodiscard]] torch::Tensor get_prefix_sum_idx(__attribute__ ((unused)) torch::Tensor value) const override {
             throw NotImplemented();
         }
 

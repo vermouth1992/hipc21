@@ -44,9 +44,9 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
         spdlog::info("Setting up the replay buffer");
-        std::unique_ptr<DataSpec> action_data_spec;
-        auto action_space = env->action_space();
-        auto observation_space = env->observation_space();
+        std::unique_ptr <DataSpec> action_data_spec;
+        auto action_space = test_env->action_space();
+        auto observation_space = test_env->observation_space();
         if (action_space->type == action_space->DISCRETE) {
             action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
         } else {

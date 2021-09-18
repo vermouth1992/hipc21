@@ -24,5 +24,5 @@ set(LIBSOURCE
         src/logger.cpp
         src/off_policy_trainer_fpga.cpp)
 
-add_library(rlu ${LIBSOURCE})
+add_library(rlu SHARED ${LIBSOURCE})
 target_link_libraries(rlu "${TORCH_LIBRARIES}" fmt::fmt)

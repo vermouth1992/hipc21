@@ -19,7 +19,7 @@ namespace rlu::nn {
     // template function implemented in the header.
     template<typename T>
     std::vector<T> convert_tensor_to_flat_vector(const torch::Tensor &tensor) {
-        torch::Tensor t = torch::flatten(tensor);
+        torch::Tensor t = torch::flatten(tensor.cpu());
         return {t.data_ptr<T>(), t.data_ptr<T>() + t.numel()};
     }
 }
