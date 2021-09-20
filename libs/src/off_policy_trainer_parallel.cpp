@@ -78,7 +78,7 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
-    spdlog::debug("Running actor thread {}", pthread_self());
+    spdlog::debug("Running actor thread {}", fmt::ptr(pthread_self()));
     // get environment
     auto curr_env = envs.at(index);
 
@@ -170,7 +170,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
-    spdlog::debug("Running learner thread {}", pthread_self());
+    spdlog::debug("Running learner thread {}", fmt::ptr(pthread_self()));
     int64_t max_global_steps = epochs * steps_per_epoch;
     while (true) {
         // get global steps
