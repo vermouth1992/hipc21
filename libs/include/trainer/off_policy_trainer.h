@@ -11,6 +11,7 @@
 
 #include "agent/off_policy_agent.h"
 #include "replay_buffer/replay_buffer.h"
+#include "tester.h"
 #include "logger.h"
 #include "gym/gym.h"
 #include "utils/stop_watcher.h"
@@ -30,9 +31,10 @@ namespace rlu::trainer {
                                   int64_t policy_delay,
                                   int64_t num_test_episodes,
                                   torch::Device device,
-                                  int64_t seed);
+                                  int64_t seed,
+                                  bool online_test = false);
 
-        virtual ~OffPolicyTrainer() = default;
+        virtual ~OffPolicyTrainer();
 
         void setup_logger(std::optional<std::string> exp_name, const std::string &data_dir);
 
@@ -49,6 +51,7 @@ namespace rlu::trainer {
         std::shared_ptr<Gym::Environment> env;
         std::shared_ptr<Gym::Environment> test_env;
         std::shared_ptr<rlu::logger::EpochLogger> logger;
+        std::shared_ptr<rlu::trainer::Tester> tester;
         const std::shared_ptr<agent::OffPolicyAgent> agent;
         const int64_t epochs;
         const int64_t steps_per_epoch;
@@ -60,8 +63,9 @@ namespace rlu::trainer {
         const int64_t policy_delay;
         const torch::Device device;
         const torch::Device cpu = torch::kCPU;
-
         int64_t seed;
+        const bool online_test;
+        // temporary variables
         int64_t total_steps{};
         float episode_rewards{};
         float episode_length{};

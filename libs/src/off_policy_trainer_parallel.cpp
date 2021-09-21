@@ -78,7 +78,11 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
+#ifdef __APPLE__
     spdlog::debug("Running actor thread {}", fmt::ptr(pthread_self()));
+#else
+    spdlog::debug("Running actor thread {}", pthread_self());
+#endif
     // get environment
     auto curr_env = envs.at(index);
 
@@ -170,7 +174,11 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
+#ifdef __APPLE__
     spdlog::debug("Running learner thread {}", fmt::ptr(pthread_self()));
+#else
+    spdlog::debug("Running learner thread {}", pthread_self());
+#endif
     int64_t max_global_steps = epochs * steps_per_epoch;
     while (true) {
         // get global steps

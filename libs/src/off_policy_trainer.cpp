@@ -14,7 +14,7 @@ namespace rlu::trainer {
                                        int64_t epochs, int64_t steps_per_epoch,
                                        int64_t start_steps, int64_t update_after, int64_t update_every,
                                        int64_t update_per_step, int64_t policy_delay, int64_t num_test_episodes,
-                                       torch::Device device, int64_t seed) :
+                                       torch::Device device, int64_t seed, bool online_test) :
             env_fn(std::move(env_fn)),
             agent_fn(agent_fn),
             env(nullptr),
@@ -29,8 +29,8 @@ namespace rlu::trainer {
             update_per_step(update_per_step),
             policy_delay(policy_delay),
             device(device),
-            seed(seed) {
-
+            seed(seed),
+            online_test(online_test) {
     }
 
     void OffPolicyTrainer::setup_logger(std::optional<std::string> exp_name, const std::string &data_dir) {
@@ -44,7 +44,7 @@ namespace rlu::trainer {
 
     void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
         spdlog::info("Setting up the replay buffer");
-        std::unique_ptr <DataSpec> action_data_spec;
+        std::unique_ptr<DataSpec> action_data_spec;
         auto action_space = test_env->action_space();
         auto observation_space = test_env->observation_space();
         if (action_space->type == action_space->DISCRETE) {
@@ -65,6 +65,9 @@ namespace rlu::trainer {
     }
 
     void OffPolicyTrainer::train() {
+        if (online_test) {
+            tester = std::make_shared<rlu::trainer::Tester>(test_env, agent, logger, num_test_episodes, device);
+        }
         // setup agent
         agent->to(device);
         watcher.start();
@@ -81,11 +84,9 @@ namespace rlu::trainer {
             }
 
             // test the current policy
-            spdlog::debug("Start testing");
-            for (int i = 0; i < num_test_episodes; ++i) {
-                test_step(this->agent);
+            if (online_test) {
+                tester->run();
             }
-            spdlog::debug("Finish testing");
 
             watcher.lap();
 
@@ -94,8 +95,9 @@ namespace rlu::trainer {
             logger->log_tabular("EpRet", std::nullopt, true);
             logger->log_tabular("EpLen", std::nullopt, false, true);
             logger->log_tabular("TotalEnvInteracts", (float) total_steps);
-            logger->log_tabular("TestEpRet", std::nullopt, true);
-            logger->log_tabular("TestEpLen", std::nullopt, false, true);
+            if (online_test) {
+                tester->log_tabular();
+            }
             agent->log_tabular();
             logger->log_tabular("Time", (float) watcher.seconds());
             logger->dump_tabular();
@@ -217,6 +219,11 @@ namespace rlu::trainer {
         spdlog::info("Setting up the environment");
         this->env = env_fn();
         this->test_env = env_fn();
+    }
+
+    OffPolicyTrainer::~OffPolicyTrainer() {
+        env->close();
+        test_env->close();
     }
 
 }

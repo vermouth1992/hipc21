@@ -4,6 +4,8 @@
 #include "base64.h"
 #include <cstdio>
 #include <iostream>
+#include <utility>
+#include "subprocess.hpp"
 
 using nlohmann::json;
 
@@ -48,7 +50,7 @@ namespace Gym {
             if (!shape.is_array())
                 throw std::runtime_error("cannot parse box space (1)");
             // construct shape
-            for (auto &s : shape) {
+            for (auto &s: shape) {
                 int e = s.get<int>();
                 r->box_shape.push_back(e);
             }
@@ -79,13 +81,15 @@ namespace Gym {
     class ClientReal final : public Client, public std::enable_shared_from_this<ClientReal> {
     public:
         std::string addr;
-        int port{};
+        int port;
+        std::shared_ptr<subprocess::Popen> server_proc;
 
         std::shared_ptr<CURL> h;
         std::shared_ptr<curl_slist> headers;
         std::vector<char> curl_error_buf;
 
-        ClientReal() {
+        ClientReal(std::string addr, int port) : addr(std::move(addr)), port(port) {
+            create_server();
             CURL *c = curl_easy_init();
             curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT_MS, 60000);
@@ -101,6 +105,17 @@ namespace Gym {
 //            headers.reset(curl_slist_append(0, "Content-Type: application/json"), std::ptr_fun(curl_slist_free_all));
             headers.reset(curl_slist_append(nullptr, "Content-Type: application/json"),
                           [](struct curl_slist *l) { curl_slist_free_all(l); });
+        }
+
+        void create_server() {
+            server_proc = std::make_shared<subprocess::Popen>(
+                    fmt::format("python ../envs/gym_http_server.py -p {}", port));
+            // wait some time for the server to run
+            sleep(5);
+        }
+
+        void close_server() {
+            server_proc->kill();
         }
 
         json GET(const std::string &route) {
@@ -166,9 +181,7 @@ namespace Gym {
     };
 
     std::shared_ptr<Client> client_create(const std::string &addr, int port) {
-        std::shared_ptr<ClientReal> client(new ClientReal);
-        client->addr = addr;
-        client->port = port;
+        std::shared_ptr<ClientReal> client = std::make_shared<ClientReal>(addr, port);
         return client;
     }
 
@@ -224,6 +237,7 @@ namespace Gym {
         void close() override {
             json j;
             client->POST("/v1/envs/" + instance_id + "/close/", j.dump());
+            client->close_server();
         }
     };
 
