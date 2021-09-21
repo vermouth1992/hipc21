@@ -10,7 +10,7 @@
 #include "gym/gym.h"
 #include "logger.h"
 #include "type.h"
-#include "replay_buffer/replay_buffer.h"
+#include "replay_buffer/replay_buffer_base.h"
 #include "utils/rl_functional.h"
 #include "utils/stop_watcher.h"
 

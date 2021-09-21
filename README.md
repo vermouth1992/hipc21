@@ -9,22 +9,36 @@ We manage all the dependencies using Anaconda for the most simplicity
 - fmt
 - curl
 - pybind11
+- flask
 
 ```bash
 conda install nlohmann_json spdlog fmt curl pybind11 flask -c conda-forge
 ```
 
-If need GPU support
+- Install Pytorch from [here](https://pytorch.org/get-started/locally/)
 
-- cudatoolkit-dev (If Pytorch is installed with Cuda support)
+If your Pytorch is installed with GPU support, you also need to install the following packages
+
+- cudatoolkit-dev
 - CuDNN
 
 ```bash
-conda install cudnn cudatoolkit-dev==11.1.1 -c conda-forge
+conda install cudnn cudatoolkit-dev==${CUDA_VERSION} -c conda-forge
 ```
 
-- Pytorch
+Make sure the CUDA_VERSION matches the one you installed your Pytorch
 
+## Build
+Before building, make sure your Python is pointing to the Anaconda environment using
 ```bash
-conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c nvidia 
+which python
 ```
+Then, execute
+```bash
+mkdir build;
+cd build;
+cmake ..
+make -j 8
+```
+
+## Running

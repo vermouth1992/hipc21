@@ -5,6 +5,7 @@
 
 #include "agent/agent.h"
 #include "trainer/trainer.h"
+#include "trainer/off_policy_trainer_fpga.h"
 #include "cxxopts.hpp"
 #include "spdlog/spdlog.h"
 

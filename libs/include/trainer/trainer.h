@@ -6,7 +6,6 @@
 #define HIPC21_TRAINER_H
 
 #include "off_policy_trainer.h"
-#include "off_policy_trainer_fpga.h"
 #include "off_policy_trainer_parallel.h"
 
 #endif //HIPC21_TRAINER_H

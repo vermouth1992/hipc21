@@ -20,12 +20,13 @@ find_package(fmt REQUIRED)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
 
-include_directories("libs/include" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
+include_directories("libs/include" "libs_fpga/include" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
 link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 
 add_subdirectory(Google_tests)
 add_subdirectory(libs)
+add_subdirectory(libs_fpga)
 add_subdirectory(envs)
 #add_subdirectory(binding)
 
@@ -35,5 +36,5 @@ set(SOURCE_FILES
 
 add_executable(hipc21 ${SOURCE_FILES})
 
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu rlu_fpga gym_cpp)
 

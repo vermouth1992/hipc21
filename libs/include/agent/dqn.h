@@ -8,7 +8,7 @@
 #include <torch/torch.h>
 #include <utility>
 #include "gym/gym.h"
-#include "replay_buffer/replay_buffer.h"
+#include "replay_buffer/replay_buffer_base.h"
 #include "common.h"
 #include "agent/off_policy_agent.h"
 #include "utils/rl_functional.h"

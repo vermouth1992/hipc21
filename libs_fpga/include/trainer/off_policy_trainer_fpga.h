@@ -10,7 +10,8 @@
  * The steps for training on FPGA
  */
 
-#include "off_policy_trainer_parallel.h"
+#include "trainer/off_policy_trainer_parallel.h"
+#include "replay_buffer/segment_tree_fpga.h"
 
 namespace rlu::trainer {
     class OffPolicyTrainerFPGA : public OffPolicyTrainerParallel {
@@ -69,8 +70,8 @@ namespace rlu::trainer {
                     {"done",     DataSpec({}, torch::kFloat32)},
             };
 
-            this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer>(
-                    replay_size, data_spec, batch_size, 0.8, "fpga");
+            this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer<rlu::replay_buffer::SegmentTreeFPGA>>(
+                    replay_size, data_spec, batch_size, 0.8);
         }
 
 
