@@ -40,9 +40,9 @@ namespace rlu::replay_buffer {
         }
 
         void update_priorities(const torch::Tensor &idx, const torch::Tensor &priorities) {
-            auto new_priority = torch::pow(torch::abs(priorities + 1e-6), m_alpha);
-            m_max_priority = std::max(m_max_priority, torch::max(new_priority).item().toFloat());
-            m_min_priority = std::min(m_min_priority, torch::min(new_priority).item().toFloat());
+            m_max_priority = std::max(m_max_priority, torch::max(priorities).item().toFloat());
+            m_min_priority = std::min(m_min_priority, torch::min(priorities).item().toFloat());
+            auto new_priority = torch::pow(torch::abs(priorities + 1e-2), m_alpha);
             m_segment_tree->set(idx, new_priority);
         };
 

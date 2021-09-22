@@ -6,6 +6,7 @@
 
 #include <utility>
 #include "nameof.hpp"
+#include "fmt/ostream.h"
 
 namespace rlu::trainer {
 
@@ -61,8 +62,8 @@ namespace rlu::trainer {
                 {"done",     DataSpec({}, torch::kFloat32)},
         };
 
-        this->buffer = std::make_shared<replay_buffer::UniformReplayBuffer>(
-                replay_size, data_spec, batch_size);
+        this->buffer = std::make_shared<replay_buffer::PrioritizedReplayBuffer<replay_buffer::SegmentTreeTorch>>(
+                replay_size, data_spec, batch_size, 0.6);
         this->temp_buffer = std::make_shared<replay_buffer::UniformReplayBuffer>(batch_size, data_spec, 1);
     }
 
@@ -129,17 +130,13 @@ namespace rlu::trainer {
         // copy observation
         auto current_obs = s.observation;
         if (total_steps < start_steps) {
-            spdlog::debug("Sample random actions");
             action = env->action_space()->sample();
         } else {
-            spdlog::debug("Start using agent action");
             action = agent->act_single(current_obs.to(device), true).to(cpu);
         }
 
-        spdlog::debug("Before step");
         // environment step
         env->step(action, false, &s);
-        spdlog::debug("After step");
 
         // TODO: need to see if it is true done or done due to reaching the maximum length.
         // convert data type
@@ -154,21 +151,25 @@ namespace rlu::trainer {
                                   {"next_obs", s.observation},
                                   {"rew",      reward_tensor},
                                   {"done",     done_tensor}};
+        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
         this->temp_buffer->add_single(single_data);
+        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
+        spdlog::debug("Size of the buffer {}", this->buffer->size());
 
         if (this->temp_buffer->full()) {
             // if the temporary buffer is full, compute the priority and set
             auto storage = this->temp_buffer->get_storage();
-//            auto priority = this->agent->compute_priority(storage.at("obs"),
-//                                                          storage.at("act"),
-//                                                          storage.at("next_obs"),
-//                                                          storage.at("rew"),
-//                                                          storage.at("done"));
-//            storage["priority"] = priority;
+            auto priority = this->agent->compute_priority(storage.at("obs"),
+                                                          storage.at("act"),
+                                                          storage.at("next_obs"),
+                                                          storage.at("rew"),
+                                                          storage.at("done"));
+            storage["priority"] = priority;
+            spdlog::debug("Size of the buffer {}", this->buffer->size());
             buffer->add_batch(storage);
+            spdlog::debug("Size of the buffer {}", this->buffer->size());
+            this->temp_buffer->reset();
         }
-
-        spdlog::debug("After buffer adding");
 
         episode_rewards += s.reward;
         episode_length += 1;
@@ -189,16 +190,22 @@ namespace rlu::trainer {
             if (total_steps % update_every == 0) {
                 for (int i = 0; i < update_every * update_per_step; i++) {
                     // generate index
-                    spdlog::debug("Generating index");
                     auto idx = buffer->generate_idx();
                     // retrieve the actual data
-                    spdlog::debug("Gathering data");
                     auto data = buffer->operator[](idx);
                     // training
                     spdlog::debug("Agent training");
                     std::optional<torch::Tensor> importance_weights;
                     if (data.contains("weights")) {
                         importance_weights = data["weights"].to(device);
+                        auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
+                        if (tensorIsNan) {
+                            throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
+                                                                 importance_weights.value()));
+                        }
+                        spdlog::debug("importance weights min {}, max {}",
+                                      torch::min(importance_weights.value()).item<float>(),
+                                      torch::max(importance_weights.value()).item<float>());
                     }
                     auto log = agent->train_step(data["obs"].to(device),
                                                  data["act"].to(device),
