@@ -93,6 +93,7 @@ int main(int argc, char **argv) {
 
         // get environment function
         std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&port, &env_id]() {
+            spdlog::info("Creating environment with port {}", port);
             std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", port);
             port += 1;
             return client->make(env_id);
@@ -100,6 +101,7 @@ int main(int argc, char **argv) {
 
         // get agent function
         std::function<std::shared_ptr<rlu::agent::OffPolicyAgent>()> agent_fn = [&env_fn, &algorithm]() {
+            spdlog::info("Creating agent");
             return create_agent(env_fn, algorithm);
         };
 

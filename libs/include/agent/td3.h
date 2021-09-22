@@ -39,6 +39,12 @@ namespace rlu::agent {
 
         torch::Tensor act_single(const torch::Tensor &obs, bool exploration) override;
 
+        torch::Tensor
+        compute_priority(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                         const torch::Tensor &rew, const torch::Tensor &done) override {
+            return {};
+        }
+
         void set_grad(const str_to_tensor_list &grads) override {
 
         }
@@ -51,7 +57,7 @@ namespace rlu::agent {
         }
 
         void update_step(bool update_target) override {
-            
+
         }
 
     private:

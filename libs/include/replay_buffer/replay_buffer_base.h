@@ -28,17 +28,25 @@ namespace rlu::replay_buffer {
 
         void reset();
 
+        bool empty() const;
+
+        bool full() const;
+
         [[nodiscard]] int64_t size() const;
 
         [[nodiscard]] int64_t capacity() const;
 
-        str_to_tensor operator[](const torch::Tensor &idx);
+        virtual str_to_tensor operator[](const torch::Tensor &idx) const;
 
-        str_to_tensor get();
+        str_to_tensor get() const;
 
-        virtual void add_batch(const str_to_tensor &data);
+        const str_to_tensor &get_storage() const;
 
-        void add_single(const str_to_tensor &data);
+        virtual void add_batch(str_to_tensor &data);
+
+        void add_single(str_to_tensor &data);
+
+        virtual void post_process(str_to_tensor &data);
 
     protected:
         str_to_tensor m_storage;

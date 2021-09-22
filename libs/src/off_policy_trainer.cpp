@@ -61,8 +61,9 @@ namespace rlu::trainer {
                 {"done",     DataSpec({}, torch::kFloat32)},
         };
 
-        this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer<rlu::replay_buffer::SegmentTreeCPP>>(
-                replay_size, data_spec, batch_size, 0.8);
+        this->buffer = std::make_shared<replay_buffer::UniformReplayBuffer>(
+                replay_size, data_spec, batch_size);
+        this->temp_buffer = std::make_shared<replay_buffer::UniformReplayBuffer>(batch_size, data_spec, 1);
     }
 
     void OffPolicyTrainer::train() {
@@ -148,16 +149,24 @@ namespace rlu::trainer {
                                          torch::TensorOptions().dtype(torch::kFloat32));
 
         // store the data in a temporary buffer
+        str_to_tensor single_data{{"obs",      current_obs},
+                                  {"act",      action},
+                                  {"next_obs", s.observation},
+                                  {"rew",      reward_tensor},
+                                  {"done",     done_tensor}};
+        this->temp_buffer->add_single(single_data);
 
-
-        // store data to the replay buffer
-        buffer->add_single({
-                                   {"obs",      current_obs},
-                                   {"act",      action},
-                                   {"next_obs", s.observation},
-                                   {"rew",      reward_tensor},
-                                   {"done",     done_tensor}
-                           });
+        if (this->temp_buffer->full()) {
+            // if the temporary buffer is full, compute the priority and set
+            auto storage = this->temp_buffer->get_storage();
+//            auto priority = this->agent->compute_priority(storage.at("obs"),
+//                                                          storage.at("act"),
+//                                                          storage.at("next_obs"),
+//                                                          storage.at("rew"),
+//                                                          storage.at("done"));
+//            storage["priority"] = priority;
+            buffer->add_batch(storage);
+        }
 
         spdlog::debug("After buffer adding");
 
@@ -187,13 +196,20 @@ namespace rlu::trainer {
                     auto data = buffer->operator[](idx);
                     // training
                     spdlog::debug("Agent training");
-                    agent->train_step(data["obs"].to(device),
-                                      data["act"].to(device),
-                                      data["next_obs"].to(device),
-                                      data["rew"].to(device),
-                                      data["done"].to(device),
-                                      std::nullopt,
-                                      num_updates % policy_delay == 0);
+                    std::optional<torch::Tensor> importance_weights;
+                    if (data.contains("weights")) {
+                        importance_weights = data["weights"].to(device);
+                    }
+                    auto log = agent->train_step(data["obs"].to(device),
+                                                 data["act"].to(device),
+                                                 data["next_obs"].to(device),
+                                                 data["rew"].to(device),
+                                                 data["done"].to(device),
+                                                 importance_weights,
+                                                 num_updates % policy_delay == 0);
+                    // update priority
+                    log["idx"] = idx;
+                    this->buffer->post_process(log);
                     spdlog::debug("After agent training");
                     num_updates += 1;
                 }

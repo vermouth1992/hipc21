@@ -5,7 +5,7 @@ project(Google_tests)
 
 # 'lib' is the folder with Google Test sources
 add_subdirectory(lib)
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} "${LIBTORCH}/include" "../envs/binding-cpp/include")
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} "${TORCH_INCLUDE_DIRS}" "../envs/binding-cpp/include")
 
 find_package(fmt)
 # 'Google_Tests_run' is the target name

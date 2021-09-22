@@ -20,7 +20,7 @@ find_package(fmt REQUIRED)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra -Wno-unused-parameter")
 
-include_directories("libs/include" "libs_fpga/include" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
+include_directories("libs/include" "libs_fpga/include" "${TORCH_INCLUDE_DIRS}" "envs/binding-cpp/include" "third_party")
 link_directories(${CONDA_PATH}/lib)
 #link_directories("/opt/intel/oneapi/mkl/2021.3.0/lib/intel64")
 

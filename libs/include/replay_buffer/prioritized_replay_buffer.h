@@ -21,12 +21,15 @@ namespace rlu::replay_buffer {
             m_segment_tree = std::make_shared<SegmentTreeClass>(capacity);
         }
 
+        str_to_tensor operator[](const torch::Tensor &idx) const override {
+            auto result = ReplayBuffer::operator[](idx);
+            result["weights"] = this->get_weights(idx, 1.0);
+            return result;
+        }
+
         [[nodiscard]] torch::Tensor generate_idx() const override {
             // generate index according to the priority
             return m_segment_tree->sample_idx(m_batch_size);
-            auto scalar = torch::rand({m_batch_size}) * m_segment_tree->reduce();
-            auto idx = m_segment_tree->get_prefix_sum_idx(scalar);
-            return idx;
         }
 
         [[nodiscard]] torch::Tensor get_weights(const torch::Tensor &idx, float beta) const {
@@ -43,29 +46,27 @@ namespace rlu::replay_buffer {
             m_segment_tree->set(idx, new_priority);
         };
 
-        void add_batch(const str_to_tensor &data) override {
+        void post_process(str_to_tensor &data) override {
+            auto idx = data.at("idx");
+            auto priorities = data.at("priority");
+            this->update_priorities(idx, priorities);
+        }
+
+        void add_batch(str_to_tensor &data) override {
             int64_t batch_size = data.begin()->second.sizes()[0];
-            auto priorities = torch::ones({batch_size}) * m_max_priority;
+            torch::Tensor priorities;
+            if (data.contains("priority")) {
+                priorities = data.at("priority");
+                data.erase("priority");
+            } else {
+                priorities = torch::ones({batch_size}) * m_max_priority;
+            }
+
             this->add_batch(data, priorities);
         };
 
-        void add_batch(const str_to_tensor &data, const torch::Tensor &priorities) {
+        void add_batch(str_to_tensor &data, torch::Tensor &priorities) {
             int64_t batch_size = data.begin()->second.sizes()[0];
-            if (m_ptr + batch_size > capacity()) {
-                std::cout << "Reaches the end of the replay buffer" << std::endl;
-            }
-            for (auto &it: data) {
-                AT_ASSERT(batch_size == it.second.sizes()[0]);
-                if (m_ptr + batch_size > capacity()) {
-                    m_storage[it.first].index_put_({Slice(m_ptr, None)},
-                                                   it.second.index({Slice(None, capacity() - m_ptr)}));
-                    m_storage[it.first].index_put_({Slice(None, batch_size - (capacity() - m_ptr))},
-                                                   it.second.index({Slice(capacity() - m_ptr, None)}));
-                } else {
-                    m_storage[it.first].index_put_({Slice(m_ptr, m_ptr + batch_size)}, it.second);
-                }
-            }
-
             // update priority
             torch::Tensor idx;
             if (m_ptr + batch_size > capacity()) {
@@ -74,11 +75,8 @@ namespace rlu::replay_buffer {
             } else {
                 idx = torch::arange(m_ptr, m_ptr + batch_size);
             }
-
             this->update_priorities(idx, priorities);
-
-            m_ptr = (m_ptr + batch_size) % capacity();
-            m_size = std::min(m_size + batch_size, capacity());
+            ReplayBuffer::add_batch(data);
         }
 
     private:

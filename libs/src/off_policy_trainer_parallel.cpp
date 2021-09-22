@@ -149,13 +149,12 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
         // compute the priority
 
         // store data to the replay buffer
-        buffer->add_single({
-                                   {"obs",      current_obs},
-                                   {"act",      action},
-                                   {"next_obs", s.observation},
-                                   {"rew",      reward_tensor},
-                                   {"done",     done_tensor}
-                           });
+        str_to_tensor single_data{{"obs",      current_obs},
+                                  {"act",      action},
+                                  {"next_obs", s.observation},
+                                  {"rew",      reward_tensor},
+                                  {"done",     done_tensor}};
+        buffer->add_single(single_data);
 
         episode_rewards += s.reward;
         episode_length += 1;

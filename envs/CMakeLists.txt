@@ -1,4 +1,4 @@
-include_directories(include "${LIBTORCH}/include")
+include_directories(include "${TORCH_INCLUDE_DIRS}")
 
 set(LIBSOURCE
         binding-cpp/gym_binding.cpp

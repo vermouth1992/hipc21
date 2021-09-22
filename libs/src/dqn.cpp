@@ -59,7 +59,7 @@ namespace rlu::agent {
         spdlog::debug("After target update");
 
         str_to_tensor log_data{
-                {"abs_delta_q", torch::abs(q_values - target_q_values).detach()}
+                {"priority", torch::abs(q_values - target_q_values).detach()}
         };
 
         // logging
@@ -88,13 +88,11 @@ namespace rlu::agent {
     }
 
     torch::Tensor DQN::act_test_single(const torch::Tensor &obs) {
-        {
-            torch::NoGradGuard no_grad;
-            auto obs_batch = obs.unsqueeze(0);
-            auto q_values = this->q_network.forward(obs_batch); // shape (None, act_dim)
-            auto act_batch = std::get<1>(torch::max(q_values, -1));
-            return act_batch.index({0});
-        }
+        torch::NoGradGuard no_grad;
+        auto obs_batch = obs.unsqueeze(0);
+        auto q_values = this->q_network.forward(obs_batch); // shape (None, act_dim)
+        auto act_batch = std::get<1>(torch::max(q_values, -1));
+        return act_batch.index({0});
     }
 
     void DQN::log_tabular() {
@@ -144,21 +142,27 @@ namespace rlu::agent {
     torch::Tensor
     DQN::compute_next_obs_q(const torch::Tensor &next_obs, const torch::Tensor &rew, const torch::Tensor &done) {
         // compute target values
-        torch::Tensor target_q_values;
-        {
-            torch::NoGradGuard no_grad;
-            target_q_values = this->target_q_network.forward(next_obs); // shape (None, act_dim)
-
-            if (m_double_q) {
-                auto target_actions = std::get<1>(
-                        torch::max(this->q_network.forward(next_obs), -1)); // shape (None,)
-                target_q_values = torch::gather(target_q_values, 1, target_actions.unsqueeze(1)).squeeze(1);
-            } else {
-                target_q_values = std::get<0>(torch::max(target_q_values, -1));
-            }
-            target_q_values = rew + gamma * (1. - done) * target_q_values;
+        torch::NoGradGuard no_grad;
+        torch::Tensor target_q_values = this->target_q_network.forward(next_obs); // shape (None, act_dim)
+        if (m_double_q) {
+            auto target_actions = std::get<1>(
+                    torch::max(this->q_network.forward(next_obs), -1)); // shape (None,)
+            target_q_values = torch::gather(target_q_values, 1, target_actions.unsqueeze(1)).squeeze(1);
+        } else {
+            target_q_values = std::get<0>(torch::max(target_q_values, -1));
         }
+        target_q_values = rew + gamma * (1. - done) * target_q_values;
         return target_q_values;
+    }
+
+    torch::Tensor
+    DQN::compute_priority(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                          const torch::Tensor &rew, const torch::Tensor &done) {
+        torch::NoGradGuard no_grad;
+        torch::Tensor target_q_values = this->compute_next_obs_q(next_obs, rew, done);
+        auto q_values = this->q_network.forward(obs);
+        q_values = torch::gather(q_values, 1, act.unsqueeze(1)).squeeze(1); // (None,)
+        return torch::abs(q_values - target_q_values);
     }
 
 }
