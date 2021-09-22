@@ -53,6 +53,12 @@ namespace rlu::trainer {
 
         void start_learner_threads();
 
+        static void *actor_fn(void *param_);
+
+        static void *learner_fn(void *param_);
+
+        static void *tester_fn(void *param_);
+
         // agents
         const std::shared_ptr<agent::OffPolicyAgent> actor;
         // threads
@@ -72,13 +78,8 @@ namespace rlu::trainer {
         pthread_mutex_t learner_barrier{};
         pthread_cond_t learner_cond{};
 
+
     private:
-        static void *actor_fn(void *param_);
-
-        static void *learner_fn(void *param_);
-
-        static void *tester_fn(void *param_);
-
         /*
          * Aggregate the gradients
          */

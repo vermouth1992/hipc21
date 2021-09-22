@@ -61,7 +61,8 @@ namespace rlu::trainer {
                 {"done",     DataSpec({}, torch::kFloat32)},
         };
 
-        this->buffer = std::make_shared<rlu::replay_buffer::UniformReplayBuffer>(replay_size, data_spec, batch_size);
+        this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer<rlu::replay_buffer::SegmentTreeCPP>>(
+                replay_size, data_spec, batch_size, 0.8);
     }
 
     void OffPolicyTrainer::train() {
@@ -146,7 +147,8 @@ namespace rlu::trainer {
         auto done_tensor = torch::tensor({true_done},
                                          torch::TensorOptions().dtype(torch::kFloat32));
 
-        //
+        // store the data in a temporary buffer
+
 
         // store data to the replay buffer
         buffer->add_single({

@@ -76,15 +76,6 @@ namespace rlu::trainer {
 
 
     protected:
-        static void *learner_fn(void *param_) {
-            auto param = (std::pair<OffPolicyTrainerFPGA *, size_t> *) param_;
-            OffPolicyTrainerFPGA *This = param->first;
-            size_t index = param->second;
-            MSG("Running learner thread " << pthread_self());
-            This->learner_fn_internal(index);
-            return nullptr;
-        }
-
         void learner_fn_internal(size_t index) override {
             // we assume there is only one learner here.
             int64_t max_global_steps = epochs * steps_per_epoch;

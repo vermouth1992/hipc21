@@ -11,6 +11,7 @@
 
 #include "agent/off_policy_agent.h"
 #include "replay_buffer/replay_buffer.h"
+#include "replay_buffer/segment_tree.h"
 #include "tester.h"
 #include "logger.h"
 #include "gym/gym.h"
@@ -48,6 +49,8 @@ namespace rlu::trainer {
         const std::function<std::shared_ptr<Gym::Environment>()> env_fn;
         const std::function<std::shared_ptr<agent::OffPolicyAgent>()> agent_fn;
         std::shared_ptr<rlu::replay_buffer::ReplayBuffer> buffer;
+        // a replay buffer holding temporary data.
+        std::shared_ptr<rlu::replay_buffer::ReplayBuffer> temp_buffer;
         std::shared_ptr<Gym::Environment> env;
         std::shared_ptr<Gym::Environment> test_env;
         std::shared_ptr<rlu::logger::EpochLogger> logger;

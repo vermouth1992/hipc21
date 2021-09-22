@@ -18,7 +18,7 @@ set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 find_package(pybind11 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra -Wno-unused-parameter")
 
 include_directories("libs/include" "libs_fpga/include" "${LIBTORCH}/include" "envs/binding-cpp/include" "third_party")
 link_directories(${CONDA_PATH}/lib)
