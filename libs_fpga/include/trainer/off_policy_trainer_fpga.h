@@ -12,6 +12,7 @@
 
 #include "trainer/off_policy_trainer_parallel.h"
 #include "replay_buffer/segment_tree_fpga.h"
+#include "fmt/ostream.h"
 
 namespace rlu::trainer {
     class OffPolicyTrainerFPGA : public OffPolicyTrainerParallel {
@@ -105,6 +106,11 @@ namespace rlu::trainer {
         // initialize the bitstream
         void initialize_bitstream(const std::string &filepath) {
             // TODO: initialize the bitstream and push to the FPGA
+            fmt::print("Number of layers {}", actor->parameters().size());
+            for (auto &param: actor->parameters()) {
+                fmt::print("{}\n", param);
+            }
+            throw std::runtime_error("Stop here");
         }
 
         void synchronize_weights() {

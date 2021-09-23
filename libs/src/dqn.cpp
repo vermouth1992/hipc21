@@ -8,7 +8,9 @@ namespace rlu::agent {
 
     DQN::DQN(const Gym::Space &obs_space,
              const Gym::Space &act_space,
-             int64_t mlp_hidden, float q_lr, float gamma, float tau, bool double_q, float epsilon_greedy) :
+             int64_t mlp_hidden,
+             int64_t num_layers,
+             float q_lr, float gamma, float tau, bool double_q, float epsilon_greedy) :
             OffPolicyAgent(tau, q_lr, gamma),
             m_act_dim(act_space.discreet_n),
             m_double_q(double_q),
@@ -18,9 +20,10 @@ namespace rlu::agent {
         if (obs_space.box_shape.size() == 1) {
             int64_t obs_dim = obs_space.box_shape[0];
             int64_t act_dim = act_space.discreet_n;
-            this->q_network = register_module("q_network", rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
+            this->q_network = register_module("q_network",
+                                              rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, num_layers));
             this->target_q_network = register_module("target_q_network",
-                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden));
+                                                     rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, num_layers));
         } else {
             throw std::runtime_error("Unsupported observation space.");
         }
