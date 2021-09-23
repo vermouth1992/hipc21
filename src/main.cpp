@@ -8,7 +8,7 @@
 #include "cxxopts.hpp"
 #include "spdlog/spdlog.h"
 
-#ifdef FPGA
+#ifdef USE_FPGA
 #include "trainer/off_policy_trainer_fpga.h"
 #endif
 
@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
                     num_learners);
         }
 
-#ifdef FPGA
+#ifdef USE_FPGA
             else if (device_name == "fpga") {
                 spdlog::info("Running fpga trainer");
                 // fpga trainer

@@ -32,7 +32,7 @@ add_subdirectory(envs)
 
 if (FPGA)
     message(STATUS "Build with FPGA support")
-    add_definitions(-FPGA)
+    add_definitions(-DUSE_FPGA)
     add_subdirectory(libs_fpga)
 else ()
     message(STATUS "Build without FPGA support")
@@ -46,7 +46,7 @@ set(SOURCE_FILES
 add_executable(hipc21 ${SOURCE_FILES})
 
 target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
-if (FPGA)
+if (WITH_FPGA)
     target_link_libraries(hipc21 rlu_fpga)
 endif ()
 
