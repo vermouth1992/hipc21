@@ -42,7 +42,7 @@ size_t rlu::trainer::OffPolicyTrainerParallel::get_num_learners() const {
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::setup_environment() {
-    this->test_env = env_fn();
+    OffPolicyTrainer::setup_environment();
     for (size_t i = 0; i < actor_mutexes.size(); i++) {
         envs.push_back(env_fn());
     }
@@ -64,6 +64,7 @@ void rlu::trainer::OffPolicyTrainerParallel::train() {
     for (auto &thread: learner_threads) {
         pthread_join(thread, nullptr);
     }
+    spdlog::info("Finish training");
 }
 
 int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment) {
@@ -78,11 +79,7 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
-#ifdef __APPLE__
-    spdlog::debug("Running actor thread {}", fmt::ptr(pthread_self()));
-#else
-    spdlog::debug("Running actor thread {}", pthread_self());
-#endif
+    spdlog::info("Running actor thread {}", index);
     // get environment
     auto curr_env = envs.at(index);
 
@@ -104,7 +101,39 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
         spdlog::debug("Current global step {}", global_steps_temp);
         // create a new thread for testing and logging
         if (global_steps_temp % steps_per_epoch == 0) {
-            this->start_tester_thread(global_steps_temp / steps_per_epoch);
+            // perform logging
+            int64_t epoch = global_steps_temp / steps_per_epoch;
+            logger->log_tabular("Epoch", epoch);
+            logger->log_tabular("EpRet", std::nullopt, true);
+            logger->log_tabular("EpLen", std::nullopt, false, true);
+            logger->log_tabular("TotalEnvInteracts", (float) (epoch * steps_per_epoch));
+
+            // add this line if the learning is implemented.
+            agent->log_tabular();
+
+            // create a new agent. Copy the weights from the current learner
+            if (online_test) {
+                std::shared_ptr<agent::OffPolicyAgent> test_actor = agent_fn();
+                pthread_mutex_lock(&test_actor_mutex);
+                rlu::functional::hard_update(*test_actor, *actor);
+                pthread_mutex_unlock(&test_actor_mutex);
+
+                // test the current policy
+                for (int i = 0; i < num_test_episodes; ++i) {
+                    test_step(test_actor);
+                }
+            }
+
+            // logging
+            watcher.lap();
+
+            if (online_test) {
+                logger->log_tabular("TestEpRet", std::nullopt, true);
+                logger->log_tabular("TestEpLen", std::nullopt, false, true);
+            }
+
+            logger->log_tabular("Time", (float) watcher.seconds());
+            logger->dump_tabular();
         }
         // determine whether to break
         if (global_steps_temp >= max_global_steps) {
@@ -121,7 +150,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
             pthread_mutex_lock(&actor_mutexes[index]);
             spdlog::debug("holding actor mutex");
             // inference on CPU
-            action = actor->act_single(current_obs, true);
+            action = actor->act_single(current_obs.to(device), true).to(cpu);
             spdlog::debug("After agent inference");
             pthread_mutex_unlock(&actor_mutexes[index]);
             spdlog::debug("release actor mutex");
@@ -170,14 +199,11 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
             episode_length = 0;
         }
     }
+    spdlog::info("Finish actor thread {}", index);
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
-#ifdef __APPLE__
-    spdlog::debug("Running learner thread {}", fmt::ptr(pthread_self()));
-#else
-    spdlog::debug("Running learner thread {}", pthread_self());
-#endif
+    spdlog::info("Running learner thread {}", index);
     int64_t max_global_steps = epochs * steps_per_epoch;
     while (true) {
         // get global steps
@@ -240,38 +266,12 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
 
             pthread_mutex_unlock(&learner_barrier);
         }
-
     }
+    spdlog::info("Finish learner thread {}", index);
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::tester_fn_internal(int64_t epoch) {
-    // perform logging
-    logger->log_tabular("Epoch", epoch);
-    logger->log_tabular("EpRet", std::nullopt, true);
-    logger->log_tabular("EpLen", std::nullopt, false, true);
-    logger->log_tabular("TotalEnvInteracts", (float) (epoch * steps_per_epoch));
 
-    // add this line if the learning is implemented.
-//            agent->log_tabular();
-
-    // create a new agent. Copy the weights from the current learner
-    std::shared_ptr<agent::OffPolicyAgent> test_actor = agent_fn();
-    pthread_mutex_lock(&test_actor_mutex);
-    rlu::functional::hard_update(*test_actor, *actor);
-    pthread_mutex_unlock(&test_actor_mutex);
-
-    // test the current policy
-    for (int i = 0; i < num_test_episodes; ++i) {
-        test_step(test_actor);
-    }
-    // logging
-    watcher.lap();
-
-    logger->log_tabular("TestEpRet", std::nullopt, true);
-    logger->log_tabular("TestEpLen", std::nullopt, false, true);
-    logger->log_tabular("Time", (float) watcher.seconds());
-
-    logger->dump_tabular();
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::start_tester_thread(int64_t epoch) {
@@ -336,4 +336,10 @@ rlu::str_to_tensor_list rlu::trainer::OffPolicyTrainerParallel::aggregate_grads(
         }
     }
     return result;
+}
+
+rlu::trainer::OffPolicyTrainerParallel::~OffPolicyTrainerParallel() {
+    for (auto &env: envs) {
+        env->close();
+    }
 }

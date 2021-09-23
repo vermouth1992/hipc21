@@ -29,6 +29,8 @@ namespace rlu::trainer {
                                           int64_t num_actors,
                                           int64_t num_learners);
 
+        virtual ~OffPolicyTrainerParallel();
+
         [[nodiscard]] size_t get_num_learners() const;
 
         void setup_environment() override;

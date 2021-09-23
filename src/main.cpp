@@ -179,6 +179,5 @@ int main(int argc, char **argv) {
         fprintf(stderr, "ERROR: %s\n", e.what());
         return 1;
     }
-
     return 0;
 }
