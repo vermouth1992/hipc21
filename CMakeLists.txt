@@ -46,7 +46,7 @@ set(SOURCE_FILES
 add_executable(hipc21 ${SOURCE_FILES})
 
 target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
-if (WITH_FPGA)
+if (FPGA)
     target_link_libraries(hipc21 rlu_fpga)
 endif ()
 

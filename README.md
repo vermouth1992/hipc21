@@ -29,16 +29,26 @@ conda install cudnn cudatoolkit-dev==${CUDA_VERSION} -c conda-forge
 Make sure the CUDA_VERSION matches the one you installed your Pytorch
 
 ## Build
+
 Before building, make sure your Python is pointing to the Anaconda environment using
+
 ```bash
 which python
 ```
+
 Then, execute
+
 ```bash
 mkdir build;
 cd build;
 cmake ..
 make -j 8
+```
+
+To compile with FPGA support, use
+
+```bash
+cmake .. -DFPGA=ON
 ```
 
 ## Running
