@@ -82,8 +82,8 @@ namespace rlu::trainer {
         pthread_cond_t learner_cond{};
         int64_t current_actor_index;
         int64_t current_learning_index;
-        pthread_mutex_t actor_index_mutex;
-        pthread_mutex_t learning_index_mutex;
+        pthread_mutex_t actor_index_mutex{};
+        pthread_mutex_t learning_index_mutex{};
 
 
     private:

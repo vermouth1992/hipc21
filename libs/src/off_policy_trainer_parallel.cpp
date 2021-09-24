@@ -333,13 +333,13 @@ void rlu::trainer::OffPolicyTrainerParallel::start_learner_threads() {
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::actor_fn(void *param_) {
-    OffPolicyTrainerParallel *This = (OffPolicyTrainerParallel *) param_;
+    auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
     This->actor_fn_internal();
     return nullptr;
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::learner_fn(void *param_) {
-    OffPolicyTrainerParallel *This = (OffPolicyTrainerParallel *) param_;
+    auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
     This->learner_fn_internal();
     return nullptr;
 }
