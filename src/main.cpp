@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
 
 #ifdef USE_FPGA
             else if (device_name == "fpga") {
+                if (num_learners != 1) throw std::runtime_error("The number of learner thread must be 1 to run on the FPGA.");
                 spdlog::info("Running fpga trainer");
                 // fpga trainer
                 trainer = std::make_shared<rlu::trainer::OffPolicyTrainerFPGA>(

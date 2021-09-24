@@ -3,6 +3,7 @@
 //
 
 #include "trainer/off_policy_trainer_parallel.h"
+#include "fmt/ostream.h"
 
 rlu::trainer::OffPolicyTrainerParallel::OffPolicyTrainerParallel(
         const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
@@ -34,6 +35,9 @@ rlu::trainer::OffPolicyTrainerParallel::OffPolicyTrainerParallel(
         grads.push_back(nullptr);
     }
     num_finished_learners = 0;
+    num_gradient_steps = 0;
+    current_actor_index = 0;
+    current_learning_index = 0;
     rlu::functional::hard_update(*actor, *agent);
 }
 
@@ -78,7 +82,14 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
     return global_steps_temp;
 }
 
-void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
+void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
+    // obtain an index
+    int64_t index;
+    pthread_mutex_lock(&actor_index_mutex);
+    index = current_actor_index;
+    current_actor_index += 1;
+    pthread_mutex_unlock(&actor_index_mutex);
+
     spdlog::info("Running actor thread {}", index);
     // get environment
     auto curr_env = envs.at(index);
@@ -107,6 +118,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
             logger->log_tabular("EpRet", std::nullopt, true);
             logger->log_tabular("EpLen", std::nullopt, false, true);
             logger->log_tabular("TotalEnvInteracts", (float) (epoch * steps_per_epoch));
+            logger->log_tabular("GradientSteps", (float) num_gradient_steps);
 
             // add this line if the learning is implemented.
             agent->log_tabular();
@@ -202,9 +214,16 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal(size_t index) {
     spdlog::info("Finish actor thread {}", index);
 }
 
-void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
+void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
+    int64_t index;
+    pthread_mutex_lock(&learning_index_mutex);
+    index = current_learning_index;
+    current_learning_index += 1;
+    pthread_mutex_unlock(&learning_index_mutex);
+
     spdlog::info("Running learner thread {}", index);
     int64_t max_global_steps = epochs * steps_per_epoch;
+
     while (true) {
         // get global steps
         int64_t global_steps_temp = this->get_global_steps(false);
@@ -221,13 +240,31 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
             auto data = buffer->operator[](idx);
             // compute the gradients
             spdlog::debug("Before compute grad");
-            auto local_grads = agent->compute_grad(data["obs"].to(device),
-                                                   data["act"].to(device),
-                                                   data["next_obs"].to(device),
-                                                   data["rew"].to(device),
-                                                   data["done"].to(device),
-                                                   std::nullopt,
-                                                   update_target);
+
+            std::optional<torch::Tensor> importance_weights;
+            if (data.contains("weights")) {
+                importance_weights = data["weights"].to(device);
+                auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
+                if (tensorIsNan) {
+                    throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
+                                                         importance_weights.value()));
+                }
+                spdlog::debug("importance weights min {}, max {}",
+                              torch::min(importance_weights.value()).item<float>(),
+                              torch::max(importance_weights.value()).item<float>());
+            }
+
+            auto output = agent->compute_grad(data["obs"].to(device),
+                                              data["act"].to(device),
+                                              data["next_obs"].to(device),
+                                              data["rew"].to(device),
+                                              data["done"].to(device),
+                                              importance_weights,
+                                              update_target);
+            auto local_grads = output.first;
+            output.second["idx"] = idx;
+            this->buffer->post_process(output.second);
+            // update
             spdlog::debug("After compute grad");
             // store the local grad in the shared memory
             grads.at(index) = std::make_shared<str_to_tensor_list>(local_grads);
@@ -263,6 +300,7 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal(size_t index) {
                 // wait the aggregator
                 pthread_cond_wait(&learner_cond, &learner_barrier);
             }
+            num_gradient_steps += 1;
 
             pthread_mutex_unlock(&learner_barrier);
         }
@@ -281,34 +319,28 @@ void rlu::trainer::OffPolicyTrainerParallel::start_tester_thread(int64_t epoch) 
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::start_actor_threads() {
-    for (size_t i = 0; i < actor_threads.size(); i++) {
-        auto param = std::make_shared<std::pair<OffPolicyTrainerParallel *, size_t>>(this, i);
-        int ret = pthread_create(&actor_threads[i], nullptr, &actor_fn, param.get());
+    for (auto &actor_thread: actor_threads) {
+        int ret = pthread_create(&actor_thread, nullptr, &actor_fn, this);
         if (ret != 0) spdlog::error("Fail to create actor thread with error code {}", ret);
     }
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::start_learner_threads() {
-    for (size_t i = 0; i < learner_threads.size(); i++) {
-        auto param = std::make_shared<std::pair<OffPolicyTrainerParallel *, size_t>>(this, i);
-        int ret = pthread_create(&learner_threads[i], nullptr, &learner_fn, param.get());
+    for (auto &learner_thread: learner_threads) {
+        int ret = pthread_create(&learner_thread, nullptr, &learner_fn, this);
         if (ret != 0) spdlog::error("Fail to create actor thread with error code {}", ret);
     }
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::actor_fn(void *param_) {
-    auto param = (std::pair<OffPolicyTrainerParallel *, size_t> *) param_;
-    OffPolicyTrainerParallel *This = param->first;
-    size_t index = param->second;
-    This->actor_fn_internal(index);
+    OffPolicyTrainerParallel *This = (OffPolicyTrainerParallel *) param_;
+    This->actor_fn_internal();
     return nullptr;
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::learner_fn(void *param_) {
-    auto param = (std::pair<OffPolicyTrainerParallel *, size_t> *) param_;
-    OffPolicyTrainerParallel *This = param->first;
-    size_t index = param->second;
-    This->learner_fn_internal(index);
+    OffPolicyTrainerParallel *This = (OffPolicyTrainerParallel *) param_;
+    This->learner_fn_internal();
     return nullptr;
 }
 

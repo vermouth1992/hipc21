@@ -29,7 +29,7 @@ namespace rlu::trainer {
                                           int64_t num_actors,
                                           int64_t num_learners);
 
-        virtual ~OffPolicyTrainerParallel();
+        ~OffPolicyTrainerParallel() override;
 
         [[nodiscard]] size_t get_num_learners() const;
 
@@ -43,9 +43,9 @@ namespace rlu::trainer {
          */
         int64_t get_global_steps(bool increment);
 
-        virtual void actor_fn_internal(size_t index);
+        virtual void actor_fn_internal();
 
-        virtual void learner_fn_internal(size_t index);
+        virtual void learner_fn_internal();
 
         virtual void tester_fn_internal(int64_t epoch);
 
@@ -77,8 +77,13 @@ namespace rlu::trainer {
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others
         size_t num_finished_learners;
+        int64_t num_gradient_steps;
         pthread_mutex_t learner_barrier{};
         pthread_cond_t learner_cond{};
+        int64_t current_actor_index;
+        int64_t current_learning_index;
+        pthread_mutex_t actor_index_mutex;
+        pthread_mutex_t learning_index_mutex;
 
 
     private:

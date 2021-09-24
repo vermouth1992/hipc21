@@ -45,13 +45,13 @@ namespace rlu::agent {
                                        const torch::Tensor &rew,
                                        const torch::Tensor &done) override;
 
-        str_to_tensor_list compute_grad(const torch::Tensor &obs,
-                                        const torch::Tensor &act,
-                                        const torch::Tensor &next_obs,
-                                        const torch::Tensor &rew,
-                                        const torch::Tensor &done,
-                                        const std::optional<torch::Tensor> &importance_weights,
-                                        bool update_target) override;
+        std::pair<str_to_tensor_list, str_to_tensor> compute_grad(const torch::Tensor &obs,
+                                                                  const torch::Tensor &act,
+                                                                  const torch::Tensor &next_obs,
+                                                                  const torch::Tensor &rew,
+                                                                  const torch::Tensor &done,
+                                                                  const std::optional<torch::Tensor> &importance_weights,
+                                                                  bool update_target) override;
 
         void set_grad(const str_to_tensor_list &grads) override;
 
