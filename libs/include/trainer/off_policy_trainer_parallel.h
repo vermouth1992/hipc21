@@ -35,6 +35,8 @@ namespace rlu::trainer {
 
         void setup_environment() override;
 
+        void setup_replay_buffer(int64_t replay_size, int64_t batch_size) override;
+
         void train() override;
 
     protected:
@@ -73,6 +75,8 @@ namespace rlu::trainer {
         pthread_mutex_t global_steps_mutex{};
         std::vector<pthread_mutex_t> actor_mutexes;
         pthread_mutex_t test_actor_mutex{};
+        pthread_mutex_t temp_buffer_mutex{};
+        pthread_mutex_t buffer_mutex{};
         // gradients
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others

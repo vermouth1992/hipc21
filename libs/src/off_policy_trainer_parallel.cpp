@@ -180,22 +180,38 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         auto done_tensor = torch::tensor({true_done},
                                          torch::TensorOptions().dtype(torch::kFloat32));
 
-        // store the data in a temporary buffer and wait for every batch size to store together
-        // step 1: secure an index. If can't, wait in the conditional variable
 
-        // step 2: add data to the index without lock
-
-        // step 3: if the temporary buffer is full, compute priority and add to the replay buffer
-
-        // compute the priority
-
-        // store data to the replay buffer
         str_to_tensor single_data{{"obs",      current_obs},
                                   {"act",      action},
                                   {"next_obs", s.observation},
                                   {"rew",      reward_tensor},
                                   {"done",     done_tensor}};
-        buffer->add_single(single_data);
+        // store the data in a temporary buffer and wait for every batch size to store together
+        // step 1: secure an index. If can't, wait in the conditional variable
+        pthread_mutex_lock(&temp_buffer_mutex);
+        this->temp_buffer->add_single(single_data);
+        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
+        spdlog::debug("Size of the buffer {}", this->buffer->size());
+
+        if (this->temp_buffer->full()) {
+            // if the temporary buffer is full, compute the priority and set
+            auto storage = this->temp_buffer->get_storage();
+            // compute the priority
+            auto priority = this->agent->compute_priority(storage.at("obs"),
+                                                          storage.at("act"),
+                                                          storage.at("next_obs"),
+                                                          storage.at("rew"),
+                                                          storage.at("done"));
+            storage["priority"] = priority;
+            spdlog::debug("Size of the buffer {}", this->buffer->size());
+            // store data to the replay buffer
+            pthread_mutex_lock(&buffer_mutex);
+            buffer->add_batch(storage);
+            pthread_mutex_unlock(&buffer_mutex);
+            spdlog::debug("Size of the buffer {}", this->buffer->size());
+            this->temp_buffer->reset();
+        }
+        pthread_mutex_unlock(&temp_buffer_mutex);
 
         episode_rewards += s.reward;
         episode_length += 1;
@@ -235,9 +251,13 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
             bool update_target = num_updates % policy_delay == 0;
             // sample a batch of data.
             // generate index
+            // TODO: when the replay buffer reaches the capacity, we need to make sure the idx is not written by the new data. Or the new priority doesn't have to update
+
+            pthread_mutex_lock(&buffer_mutex);
             auto idx = buffer->generate_idx();
             // retrieve the actual data
             auto data = buffer->operator[](idx);
+            pthread_mutex_unlock(&buffer_mutex);
             // compute the gradients
             spdlog::debug("Before compute grad");
 
@@ -263,7 +283,9 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
                                               update_target);
             auto local_grads = output.first;
             output.second["idx"] = idx;
+            pthread_mutex_lock(&buffer_mutex);
             this->buffer->post_process(output.second);
+            pthread_mutex_unlock(&buffer_mutex);
             // update
             spdlog::debug("After compute grad");
             // store the local grad in the shared memory
@@ -374,4 +396,9 @@ rlu::trainer::OffPolicyTrainerParallel::~OffPolicyTrainerParallel() {
     for (auto &env: envs) {
         env->close();
     }
+}
+
+void rlu::trainer::OffPolicyTrainerParallel::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
+    // TODO: add multiple temporary buffer to reduce the wait time
+    OffPolicyTrainer::setup_replay_buffer(replay_size, batch_size);
 }

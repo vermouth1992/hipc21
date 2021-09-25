@@ -62,7 +62,7 @@ namespace rlu::agent {
         spdlog::debug("After target update");
 
         str_to_tensor log_data{
-                {"priority", torch::abs(q_values - target_q_values).detach()}
+                {"priority", torch::abs(q_values - target_q_values).detach().cpu()}
         };
 
         // logging

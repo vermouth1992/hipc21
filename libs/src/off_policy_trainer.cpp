@@ -159,12 +159,12 @@ namespace rlu::trainer {
         if (this->temp_buffer->full()) {
             // if the temporary buffer is full, compute the priority and set
             auto storage = this->temp_buffer->get_storage();
-            auto priority = this->agent->compute_priority(storage.at("obs"),
-                                                          storage.at("act"),
-                                                          storage.at("next_obs"),
-                                                          storage.at("rew"),
-                                                          storage.at("done"));
-            storage["priority"] = priority;
+            auto priority = this->agent->compute_priority(storage.at("obs").to(device),
+                                                          storage.at("act").to(device),
+                                                          storage.at("next_obs").to(device),
+                                                          storage.at("rew").to(device),
+                                                          storage.at("done").to(device));
+            storage["priority"] = priority.cpu();
             spdlog::debug("Size of the buffer {}", this->buffer->size());
             buffer->add_batch(storage);
             spdlog::debug("Size of the buffer {}", this->buffer->size());
@@ -198,11 +198,6 @@ namespace rlu::trainer {
                     std::optional<torch::Tensor> importance_weights;
                     if (data.contains("weights")) {
                         importance_weights = data["weights"].to(device);
-                        auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
-                        if (tensorIsNan) {
-                            throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
-                                                                 importance_weights.value()));
-                        }
                         spdlog::debug("importance weights min {}, max {}",
                                       torch::min(importance_weights.value()).item<float>(),
                                       torch::max(importance_weights.value()).item<float>());
