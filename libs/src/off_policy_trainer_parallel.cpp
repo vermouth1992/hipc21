@@ -55,6 +55,8 @@ void rlu::trainer::OffPolicyTrainerParallel::setup_environment() {
 void rlu::trainer::OffPolicyTrainerParallel::train() {
     // initialize
     torch::manual_seed(seed);
+    agent->to(device);
+
     watcher.start();
     // start actor threads
     spdlog::info("Start training");
@@ -329,6 +331,7 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
                     pthread_mutex_lock(&m);
                 }
                 // TODO: need to optimize for PCIe transfer. First transfer to a CPU agent.
+
                 // Then, perform atomic weight copy
                 pthread_mutex_lock(&test_actor_mutex);
                 rlu::functional::hard_update(*actor, *agent);
