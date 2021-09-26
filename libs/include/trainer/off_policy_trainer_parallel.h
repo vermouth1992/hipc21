@@ -33,6 +33,8 @@ namespace rlu::trainer {
 
         [[nodiscard]] size_t get_num_learners() const;
 
+        [[nodiscard]] size_t get_num_actors() const;
+
         void setup_environment() override;
 
         void setup_replay_buffer(int64_t replay_size, int64_t batch_size) override;
@@ -75,7 +77,7 @@ namespace rlu::trainer {
         pthread_mutex_t global_steps_mutex{};
         std::vector<pthread_mutex_t> actor_mutexes;
         pthread_mutex_t test_actor_mutex{};
-        pthread_mutex_t temp_buffer_mutex{};
+        std::vector<pthread_mutex_t> temp_buffer_mutex;
         pthread_mutex_t buffer_mutex{};
         // gradients
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
@@ -88,7 +90,7 @@ namespace rlu::trainer {
         int64_t current_learning_index;
         pthread_mutex_t actor_index_mutex{};
         pthread_mutex_t learning_index_mutex{};
-
+        std::vector<pthread_mutex_t> agent_mutexes;
 
     private:
         /*

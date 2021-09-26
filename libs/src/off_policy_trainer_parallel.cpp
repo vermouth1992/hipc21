@@ -162,7 +162,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             pthread_mutex_lock(&actor_mutexes[index]);
             spdlog::debug("holding actor mutex");
             // inference on CPU
-            action = actor->act_single(current_obs.to(device), true).to(cpu);
+            action = actor->act_single(current_obs, true);
             spdlog::debug("After agent inference");
             pthread_mutex_unlock(&actor_mutexes[index]);
             spdlog::debug("release actor mutex");
@@ -188,30 +188,42 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
                                   {"done",     done_tensor}};
         // store the data in a temporary buffer and wait for every batch size to store together
         // step 1: secure an index. If can't, wait in the conditional variable
-        pthread_mutex_lock(&temp_buffer_mutex);
-        this->temp_buffer->add_single(single_data);
-        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
-        spdlog::debug("Size of the buffer {}", this->buffer->size());
 
-        if (this->temp_buffer->full()) {
+        // try to acquire the lock. If failed, try to get the next one
+        size_t lock_index = 0;
+        while (true) {
+            int ret = pthread_mutex_trylock(&this->temp_buffer_mutex.at(lock_index));
+            if (ret == 0) {
+                break;
+            } else {
+                lock_index = (lock_index + 1) % this->temp_buffer_mutex.size();
+            }
+        }
+
+        this->temp_buffer.at(lock_index)->add_single(single_data);
+
+        if (this->temp_buffer.at(lock_index)->full()) {
             // if the temporary buffer is full, compute the priority and set
-            auto storage = this->temp_buffer->get_storage();
-            // compute the priority
-            auto priority = this->agent->compute_priority(storage.at("obs"),
-                                                          storage.at("act"),
-                                                          storage.at("next_obs"),
-                                                          storage.at("rew"),
-                                                          storage.at("done"));
-            storage["priority"] = priority;
+            auto storage = this->temp_buffer.at(lock_index)->get_storage();
+            // compute the priority.
+            // TODO: need mutex for inference
+//            pthread_mutex_lock(&agent_mutexes.at(lock_index));
+//            auto priority = this->agent->compute_priority(storage.at("obs").to(device),
+//                                                          storage.at("act").to(device),
+//                                                          storage.at("next_obs").to(device),
+//                                                          storage.at("rew").to(device),
+//                                                          storage.at("done").to(device));
+//            pthread_mutex_unlock(&agent_mutexes.at(lock_index));
+//            storage["priority"] = priority;
             spdlog::debug("Size of the buffer {}", this->buffer->size());
             // store data to the replay buffer
             pthread_mutex_lock(&buffer_mutex);
             buffer->add_batch(storage);
             pthread_mutex_unlock(&buffer_mutex);
             spdlog::debug("Size of the buffer {}", this->buffer->size());
-            this->temp_buffer->reset();
+            this->temp_buffer.at(lock_index)->reset();
         }
-        pthread_mutex_unlock(&temp_buffer_mutex);
+        pthread_mutex_unlock(&this->temp_buffer_mutex.at(lock_index));
 
         episode_rewards += s.reward;
         episode_length += 1;
@@ -299,8 +311,18 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
                 auto aggregated_grads = this->aggregate_grads();
                 // set the gradients
                 agent->set_grad(aggregated_grads);
+
+
+//                // acquire all the inference lock
+//                for (auto &agent_mutex: agent_mutexes) {
+//                    pthread_mutex_lock(&agent_mutex);
+//                }
                 // optimizer step
                 agent->update_step(update_target);
+//                for (auto &agent_mutex: agent_mutexes) {
+//                    pthread_mutex_unlock(&agent_mutex);
+//                }
+
                 num_updates += 1;
                 // atomically copy weights to actors and test_actors
                 for (auto &m: actor_mutexes) {
@@ -401,4 +423,17 @@ rlu::trainer::OffPolicyTrainerParallel::~OffPolicyTrainerParallel() {
 void rlu::trainer::OffPolicyTrainerParallel::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
     // TODO: add multiple temporary buffer to reduce the wait time
     OffPolicyTrainer::setup_replay_buffer(replay_size, batch_size);
+    // add num_actors - 1 more temp_buffer
+    for (size_t i = 0; i < this->get_num_actors() - 1; i++) {
+        this->temp_buffer.push_back(std::make_shared<replay_buffer::UniformReplayBuffer>(
+                batch_size, this->buffer->get_data_spec(), 1));
+        this->temp_buffer_mutex.emplace_back();
+        this->agent_mutexes.emplace_back();
+    }
+    this->temp_buffer_mutex.emplace_back();
+    this->agent_mutexes.emplace_back();
+}
+
+size_t rlu::trainer::OffPolicyTrainerParallel::get_num_actors() const {
+    return this->actor_threads.size();
 }
