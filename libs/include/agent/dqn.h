@@ -28,7 +28,7 @@ namespace rlu::agent {
                      float q_lr = 1e-3,
                      float gamma = 0.99,
                      float tau = 5e-3,
-                     bool double_q = false,
+                     bool double_q = true,
                      float epsilon_greedy = 0.2);
 
         str_to_tensor train_step(const torch::Tensor &obs,

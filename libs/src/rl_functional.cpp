@@ -10,9 +10,9 @@ namespace rlu::functional {
         for (uint i = 0; i < target.parameters().size(); i++) {
             auto target_param = target.parameters()[i];
             auto param = source.parameters()[i];
-            target_param.data().copy_(param.data());
+            auto device = target_param.device();
+            target_param.data().copy_(param.data().to(device));
         }
-
     }
 
     void soft_update(const torch::nn::Module &target, const torch::nn::Module &source, float tau) {

@@ -185,6 +185,7 @@ namespace rlu::logger {
         }
         if (!m_output_dir.empty()) {
             m_output_file << std::endl;
+            m_output_file.flush();
         }
         for (int i = 0; i < n_slashes; i++) {
             fmt::print("-");
@@ -234,7 +235,12 @@ namespace rlu::logger {
         if (val != std::nullopt) {
             Logger::log_tabular(key, val.value());
         } else {
-            auto v = m_epoch_dict.at(key);
+            std::vector<float> v;
+            if (m_epoch_dict.contains(key)) {
+                v = m_epoch_dict.at(key);
+            } else {
+                v.push_back(0);
+            }
             auto stats = statistics_scalar(v, average_only, with_min_and_max);
             for (const auto &it: stats) {
                 Logger::log_tabular(it.first + key, it.second);

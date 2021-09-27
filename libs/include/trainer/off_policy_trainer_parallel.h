@@ -83,7 +83,6 @@ namespace rlu::trainer {
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others
         size_t num_finished_learners;
-        int64_t num_gradient_steps;
         pthread_mutex_t learner_barrier{};
         pthread_cond_t learner_cond{};
         int64_t current_actor_index;

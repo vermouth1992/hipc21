@@ -35,7 +35,6 @@ rlu::trainer::OffPolicyTrainerParallel::OffPolicyTrainerParallel(
         grads.push_back(nullptr);
     }
     num_finished_learners = 0;
-    num_gradient_steps = 0;
     current_actor_index = 0;
     current_learning_index = 0;
     rlu::functional::hard_update(*actor, *agent);
@@ -120,7 +119,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             logger->log_tabular("EpRet", std::nullopt, true);
             logger->log_tabular("EpLen", std::nullopt, false, true);
             logger->log_tabular("TotalEnvInteracts", (float) (epoch * steps_per_epoch));
-            logger->log_tabular("GradientSteps", (float) num_gradient_steps);
+            logger->log_tabular("GradientSteps", (float) num_updates);
 
             // add this line if the learning is implemented.
             agent->log_tabular();
@@ -241,6 +240,9 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             episode_length = 0;
         }
     }
+
+    // wait for the logger
+    sleep(1);
     spdlog::info("Finish actor thread {}", index);
 }
 
@@ -266,7 +268,7 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
             // sample a batch of data.
             // generate index
             // TODO: when the replay buffer reaches the capacity, we need to make sure the idx is not written by the new data. Or the new priority doesn't have to update
-
+            spdlog::debug("Before generating index");
             pthread_mutex_lock(&buffer_mutex);
             auto idx = buffer->generate_idx();
             // retrieve the actual data
@@ -296,10 +298,6 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
                                               importance_weights,
                                               update_target);
             auto local_grads = output.first;
-            output.second["idx"] = idx;
-            pthread_mutex_lock(&buffer_mutex);
-            this->buffer->post_process(output.second);
-            pthread_mutex_unlock(&buffer_mutex);
             // update
             spdlog::debug("After compute grad");
             // store the local grad in the shared memory
@@ -327,6 +325,10 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
 
                 num_updates += 1;
                 // atomically copy weights to actors and test_actors
+
+                // copy the weight of the agent to CPU
+
+
                 for (auto &m: actor_mutexes) {
                     pthread_mutex_lock(&m);
                 }
@@ -347,11 +349,20 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
                 // wait the aggregator
                 pthread_cond_wait(&learner_cond, &learner_barrier);
             }
-            num_gradient_steps += 1;
+
+            output.second["idx"] = idx;
+            pthread_mutex_lock(&buffer_mutex);
+            this->buffer->post_process(output.second);
+            pthread_mutex_unlock(&buffer_mutex);
 
             pthread_mutex_unlock(&learner_barrier);
+        } else {
+            // wait in a condition variable
+
         }
     }
+    // wait for the logger
+    sleep(1);
     spdlog::info("Finish learner thread {}", index);
 }
 
@@ -425,6 +436,7 @@ rlu::trainer::OffPolicyTrainerParallel::~OffPolicyTrainerParallel() {
 
 void rlu::trainer::OffPolicyTrainerParallel::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
     // TODO: add multiple temporary buffer to reduce the wait time
+    batch_size = batch_size / (int64_t) this->get_num_learners();
     OffPolicyTrainer::setup_replay_buffer(replay_size, batch_size);
     // add num_actors - 1 more temp_buffer
     for (size_t i = 0; i < this->get_num_actors() - 1; i++) {

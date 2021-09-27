@@ -120,7 +120,7 @@ namespace rlu::agent {
         str_to_tensor_list output{
                 {"q_grads", grads}
         };
-        auto priority = torch::abs(q_values - target_q_values).detach();
+        auto priority = torch::abs(q_values - target_q_values).detach().cpu();
         str_to_tensor info{{"priority", priority}};
 
         // logging. Need synchronization
