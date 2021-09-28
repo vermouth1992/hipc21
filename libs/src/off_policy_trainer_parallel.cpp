@@ -410,6 +410,7 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::actor_wait_for_learner(int64_t g
     auto num_updates_temp = num_updates;
     while (num_updates_temp < (global_steps_temp - update_after) * update_per_step) {
         // conditional wait
+        num_updates_temp = num_updates;
         pthread_cond_wait(&update_steps_cond, &update_steps_mutex);
     }
     pthread_mutex_unlock(&update_steps_mutex);
@@ -478,6 +479,7 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_wait_to_start() {
     pthread_mutex_lock(&global_steps_mutex);
     auto global_steps_temp = total_steps;
     while (global_steps_temp < update_after) {
+        global_steps_temp = total_steps;
         pthread_cond_wait(&learner_cond, &global_steps_mutex);
     }
     pthread_mutex_unlock(&global_steps_mutex);
