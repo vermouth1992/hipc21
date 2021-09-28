@@ -180,11 +180,12 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             // compute the priority.
             // TODO: need mutex for inference
             pthread_mutex_lock(&agent_mutexes.at(lock_index));
+            // TODO: add segment tree GPU
             auto priority = this->agent->compute_priority(storage.at("obs").to(device),
                                                           storage.at("act").to(device),
                                                           storage.at("next_obs").to(device),
                                                           storage.at("rew").to(device),
-                                                          storage.at("done").to(device));
+                                                          storage.at("done").to(device)).cpu();
             pthread_mutex_unlock(&agent_mutexes.at(lock_index));
             storage["priority"] = priority;
             spdlog::debug("Size of the buffer {}", this->buffer->size());
