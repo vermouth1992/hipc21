@@ -478,7 +478,7 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_wait_to_start() {
     auto global_steps_temp = total_steps;
     while (global_steps_temp < update_after) {
         global_steps_temp = total_steps;
-        pthread_cond_wait(&learner_cond, &global_steps_mutex);
+        pthread_cond_wait(&learner_init_wait_cond, &global_steps_mutex);
     }
     pthread_mutex_unlock(&global_steps_mutex);
 }
@@ -493,7 +493,7 @@ void rlu::trainer::OffPolicyTrainerParallel::wake_up_learner() {
     // wake up the learner threads
     pthread_mutex_lock(&global_steps_mutex);
     if (total_steps >= update_after) {
-        pthread_cond_broadcast(&learner_cond);
+        pthread_cond_broadcast(&learner_init_wait_cond);
     }
     pthread_mutex_unlock(&global_steps_mutex);
 }
