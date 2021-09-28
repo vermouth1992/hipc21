@@ -44,3 +44,15 @@ void rlu::trainer::Tester::test_step() {
     m_logger->store("TestEpRet", test_episode_reward);
     m_logger->store("TestEpLen", test_episode_length);
 }
+
+void rlu::trainer::Tester::set_env(const std::shared_ptr<Gym::Environment> &env) {
+    this->m_test_env = env;
+}
+
+void rlu::trainer::Tester::set_actor(const std::shared_ptr<agent::OffPolicyAgent> &actor) {
+    this->m_test_actor = actor;
+}
+
+void rlu::trainer::Tester::set_logger(const std::shared_ptr<rlu::logger::EpochLogger> &logger) {
+    this->m_logger = logger;
+}

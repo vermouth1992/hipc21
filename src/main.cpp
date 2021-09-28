@@ -5,9 +5,12 @@
 
 #include "agent/agent.h"
 #include "trainer/trainer.h"
-#include "trainer/off_policy_trainer_fpga.h"
 #include "cxxopts.hpp"
 #include "spdlog/spdlog.h"
+
+#ifdef USE_FPGA
+#include "trainer/off_policy_trainer_fpga.h"
+#endif
 
 static cxxopts::ParseResult parse(int argc, char *argv[]) {
     try {
@@ -140,25 +143,31 @@ int main(int argc, char **argv) {
                     result["seed"].as<int64_t>(),
                     num_actors,
                     num_learners);
-        } else if (device_name == "fpga") {
-            spdlog::info("Running fpga trainer");
-            // fpga trainer
-            trainer = std::make_shared<rlu::trainer::OffPolicyTrainerFPGA>(
-                    env_fn,
-                    agent_fn,
-                    result["epochs"].as<int64_t>(),
-                    result["steps_per_epoch"].as<int64_t>(),
-                    result["start_steps"].as<int64_t>(),
-                    result["update_after"].as<int64_t>(),
-                    result["update_every"].as<int64_t>(),
-                    result["update_per_step"].as<int64_t>(),
-                    result["policy_delay"].as<int64_t>(),
-                    result["num_test_episodes"].as<int64_t>(),
-                    result["seed"].as<int64_t>(),
-                    num_actors,
-                    result["bitstream"].as<std::string>()
-            );
-        } else {
+        }
+
+#ifdef USE_FPGA
+            else if (device_name == "fpga") {
+                if (num_learners != 1) throw std::runtime_error("The number of learner thread must be 1 to run on the FPGA.");
+                spdlog::info("Running fpga trainer");
+                // fpga trainer
+                trainer = std::make_shared<rlu::trainer::OffPolicyTrainerFPGA>(
+                        env_fn,
+                        agent_fn,
+                        result["epochs"].as<int64_t>(),
+                        result["steps_per_epoch"].as<int64_t>(),
+                        result["start_steps"].as<int64_t>(),
+                        result["update_after"].as<int64_t>(),
+                        result["update_every"].as<int64_t>(),
+                        result["update_per_step"].as<int64_t>(),
+                        result["policy_delay"].as<int64_t>(),
+                        result["num_test_episodes"].as<int64_t>(),
+                        result["seed"].as<int64_t>(),
+                        num_actors,
+                        result["bitstream"].as<std::string>()
+                );
+            }
+#endif
+        else {
             throw std::runtime_error(fmt::format("Unknown device name {}", device_name));
         }
 
@@ -171,6 +180,5 @@ int main(int argc, char **argv) {
         fprintf(stderr, "ERROR: %s\n", e.what());
         return 1;
     }
-
     return 0;
 }

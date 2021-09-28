@@ -3,6 +3,8 @@ project(hipc21)
 
 set(CMAKE_CXX_STANDARD 20)
 
+option(FPGA "Turn on FPGA related code build" OFF)
+
 find_package(Python COMPONENTS Interpreter Development)
 include_directories(${PYTHON_INCLUDE_DIRS})
 # assume the anaconda path is two directories above the python executable
@@ -26,8 +28,15 @@ link_directories(${CONDA_PATH}/lib)
 
 add_subdirectory(Google_tests)
 add_subdirectory(libs)
-add_subdirectory(libs_fpga)
 add_subdirectory(envs)
+
+if (FPGA)
+    message(STATUS "Build with FPGA support")
+    add_definitions(-DUSE_FPGA)
+    add_subdirectory(libs_fpga)
+else ()
+    message(STATUS "Build without FPGA support")
+endif ()
 #add_subdirectory(binding)
 
 set(SOURCE_FILES
@@ -36,5 +45,8 @@ set(SOURCE_FILES
 
 add_executable(hipc21 ${SOURCE_FILES})
 
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu rlu_fpga gym_cpp)
+target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
+if (FPGA)
+    target_link_libraries(hipc21 rlu_fpga)
+endif ()
 

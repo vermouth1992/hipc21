@@ -20,6 +20,12 @@ namespace rlu::trainer {
                         int64_t num_test_episodes,
                         const torch::Device &device);
 
+        void set_env(const std::shared_ptr<Gym::Environment> &env);
+
+        void set_actor(const std::shared_ptr<agent::OffPolicyAgent> &actor);
+
+        void set_logger(const std::shared_ptr<rlu::logger::EpochLogger> &logger);
+
         void log_tabular();
 
         void run();
@@ -29,11 +35,11 @@ namespace rlu::trainer {
 
 
     private:
-        const std::shared_ptr<rlu::logger::EpochLogger> m_logger;
+        std::shared_ptr<rlu::logger::EpochLogger> m_logger;
         int64_t m_num_test_episodes;
-        const std::shared_ptr<Gym::Environment> m_test_env;
-        const std::shared_ptr<agent::OffPolicyAgent> m_test_actor;
-        const torch::Device m_device;
+        std::shared_ptr<Gym::Environment> m_test_env;
+        std::shared_ptr<agent::OffPolicyAgent> m_test_actor;
+        torch::Device m_device;
     };
 }
 

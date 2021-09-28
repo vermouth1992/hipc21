@@ -42,6 +42,8 @@ namespace rlu::replay_buffer {
 
         const str_to_tensor &get_storage() const;
 
+        str_to_dataspec get_data_spec() const;
+
         virtual void add_batch(str_to_tensor &data);
 
         void add_single(str_to_tensor &data);
@@ -54,6 +56,7 @@ namespace rlu::replay_buffer {
         int64_t m_batch_size;
         int64_t m_size{};
         int64_t m_ptr{};
+        const str_to_dataspec data_spec;
     };
 }
 

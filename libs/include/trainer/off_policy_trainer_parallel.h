@@ -29,9 +29,15 @@ namespace rlu::trainer {
                                           int64_t num_actors,
                                           int64_t num_learners);
 
+        ~OffPolicyTrainerParallel() override;
+
         [[nodiscard]] size_t get_num_learners() const;
 
+        [[nodiscard]] size_t get_num_actors() const;
+
         void setup_environment() override;
+
+        void setup_replay_buffer(int64_t replay_size, int64_t batch_size) override;
 
         void train() override;
 
@@ -41,9 +47,9 @@ namespace rlu::trainer {
          */
         int64_t get_global_steps(bool increment);
 
-        virtual void actor_fn_internal(size_t index);
+        virtual void actor_fn_internal();
 
-        virtual void learner_fn_internal(size_t index);
+        virtual void learner_fn_internal();
 
         virtual void tester_fn_internal(int64_t epoch);
 
@@ -71,13 +77,19 @@ namespace rlu::trainer {
         pthread_mutex_t global_steps_mutex{};
         std::vector<pthread_mutex_t> actor_mutexes;
         pthread_mutex_t test_actor_mutex{};
+        std::vector<pthread_mutex_t> temp_buffer_mutex;
+        pthread_mutex_t buffer_mutex{};
         // gradients
         std::vector<std::shared_ptr<str_to_tensor_list>> grads;
         // others
         size_t num_finished_learners;
         pthread_mutex_t learner_barrier{};
         pthread_cond_t learner_cond{};
-
+        int64_t current_actor_index;
+        int64_t current_learning_index;
+        pthread_mutex_t actor_index_mutex{};
+        pthread_mutex_t learning_index_mutex{};
+        std::vector<pthread_mutex_t> agent_mutexes;
 
     private:
         /*

@@ -62,7 +62,7 @@ namespace rlu::agent {
         spdlog::debug("After target update");
 
         str_to_tensor log_data{
-                {"priority", torch::abs(q_values - target_q_values).detach()}
+                {"priority", torch::abs(q_values - target_q_values).detach().cpu()}
         };
 
         // logging
@@ -103,7 +103,7 @@ namespace rlu::agent {
         m_logger->log_tabular("LossQ", std::nullopt, false, true);
     }
 
-    str_to_tensor_list
+    std::pair<str_to_tensor_list, str_to_tensor>
     DQN::compute_grad(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
                       const torch::Tensor &rew, const torch::Tensor &done,
                       const std::optional<torch::Tensor> &importance_weights,
@@ -120,12 +120,14 @@ namespace rlu::agent {
         str_to_tensor_list output{
                 {"q_grads", grads}
         };
+        auto priority = torch::abs(q_values - target_q_values).detach().cpu();
+        str_to_tensor info{{"priority", priority}};
 
         // logging. Need synchronization
         m_logger->store("QVals", rlu::nn::convert_tensor_to_flat_vector<float>(q_values));
         m_logger->store("LossQ", loss.item<float>());
 
-        return output;
+        return std::make_pair(output, info);
     }
 
     void DQN::set_grad(const str_to_tensor_list &grads) {

@@ -8,7 +8,8 @@ namespace rlu::replay_buffer {
     ReplayBuffer::ReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec,
                                int64_t batch_size) :
             m_capacity(capacity),
-            m_batch_size(batch_size) {
+            m_batch_size(batch_size),
+            data_spec(data_spec) {
         for (auto &it: data_spec) {
             auto name = it.first;
             auto shape = it.second.m_shape;
@@ -103,6 +104,10 @@ namespace rlu::replay_buffer {
 
     void ReplayBuffer::post_process(str_to_tensor &data) {
 
+    }
+
+    str_to_dataspec ReplayBuffer::get_data_spec() const {
+        return this->data_spec;
     }
 
 }

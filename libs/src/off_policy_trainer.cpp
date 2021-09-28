@@ -64,7 +64,7 @@ namespace rlu::trainer {
 
         this->buffer = std::make_shared<replay_buffer::PrioritizedReplayBuffer<replay_buffer::SegmentTreeTorch>>(
                 replay_size, data_spec, batch_size, 0.6);
-        this->temp_buffer = std::make_shared<replay_buffer::UniformReplayBuffer>(batch_size, data_spec, 1);
+        this->temp_buffer.push_back(std::make_shared<replay_buffer::UniformReplayBuffer>(batch_size, data_spec, 1));
     }
 
     void OffPolicyTrainer::train() {
@@ -151,24 +151,27 @@ namespace rlu::trainer {
                                   {"next_obs", s.observation},
                                   {"rew",      reward_tensor},
                                   {"done",     done_tensor}};
-        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
-        this->temp_buffer->add_single(single_data);
-        spdlog::debug("Size of the temporary buffer {}", this->temp_buffer->size());
-        spdlog::debug("Size of the buffer {}", this->buffer->size());
 
-        if (this->temp_buffer->full()) {
+        auto temp_buffer_local = this->temp_buffer.at(0);
+        spdlog::debug("Size of the temporary buffer {}", temp_buffer_local->size());
+
+        temp_buffer_local->add_single(single_data);
+        spdlog::debug("Size of the temporary buffer {}", temp_buffer_local->size());
+        spdlog::debug("Size of the buffer {}", temp_buffer_local->size());
+
+        if (temp_buffer_local->full()) {
             // if the temporary buffer is full, compute the priority and set
-            auto storage = this->temp_buffer->get_storage();
-            auto priority = this->agent->compute_priority(storage.at("obs"),
-                                                          storage.at("act"),
-                                                          storage.at("next_obs"),
-                                                          storage.at("rew"),
-                                                          storage.at("done"));
-            storage["priority"] = priority;
+            auto storage = temp_buffer_local->get_storage();
+            auto priority = this->agent->compute_priority(storage.at("obs").to(device),
+                                                          storage.at("act").to(device),
+                                                          storage.at("next_obs").to(device),
+                                                          storage.at("rew").to(device),
+                                                          storage.at("done").to(device));
+            storage["priority"] = priority.cpu();
             spdlog::debug("Size of the buffer {}", this->buffer->size());
             buffer->add_batch(storage);
             spdlog::debug("Size of the buffer {}", this->buffer->size());
-            this->temp_buffer->reset();
+            temp_buffer_local->reset();
         }
 
         episode_rewards += s.reward;
@@ -198,11 +201,6 @@ namespace rlu::trainer {
                     std::optional<torch::Tensor> importance_weights;
                     if (data.contains("weights")) {
                         importance_weights = data["weights"].to(device);
-                        auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
-                        if (tensorIsNan) {
-                            throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
-                                                                 importance_weights.value()));
-                        }
                         spdlog::debug("importance weights min {}, max {}",
                                       torch::min(importance_weights.value()).item<float>(),
                                       torch::max(importance_weights.value()).item<float>());
