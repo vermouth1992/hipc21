@@ -79,10 +79,6 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
         total_steps += 1;
     }
     global_steps_temp = total_steps;
-    // wake up the learner threads
-    if (global_steps_temp >= update_after) {
-        pthread_cond_broadcast(&learner_cond);
-    }
     pthread_mutex_unlock(&global_steps_mutex);
     return global_steps_temp;
 }
@@ -108,13 +104,9 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         auto current_obs = s.observation;
 
         int64_t global_steps_temp = this->get_global_steps(true);
+        this->wake_up_learner();
 
-        spdlog::debug("Current global step {}", global_steps_temp);
-
-        // TODO: make sure the actor and the target approximately meets the update_per_step
-        // If the actors are too fast, wait for the learner.
-        // If the actors are slow, simply increase the number of actors
-        auto num_updates_temp = this->actor_wait_for_learner(global_steps_temp);
+        int64_t num_updates_temp = this->get_update_steps(false);
 
         // logging
         this->log(global_steps_temp, num_updates_temp);
@@ -123,6 +115,13 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         if (global_steps_temp >= max_global_steps) {
             break;
         }
+
+        spdlog::debug("Current global step {}", global_steps_temp);
+
+        // TODO: make sure the actor and the target approximately meets the update_per_step
+        // If the actors are too fast, wait for the learner.
+        // If the actors are slow, simply increase the number of actors
+        this->actor_wait_for_learner(global_steps_temp);
 
 
         if (global_steps_temp < start_steps) {
@@ -297,7 +296,8 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
             }
             num_finished_learners = 0;
 
-            this->wake_up_actor(global_steps_temp);
+            this->get_update_steps(true);
+            this->wake_up_actor();
 
             // broadcast
             pthread_cond_broadcast(&learner_cond);
@@ -406,16 +406,13 @@ size_t rlu::trainer::OffPolicyTrainerParallel::get_num_actors() const {
     return this->actor_threads.size();
 }
 
-int64_t rlu::trainer::OffPolicyTrainerParallel::actor_wait_for_learner(int64_t global_steps_temp) {
+void rlu::trainer::OffPolicyTrainerParallel::actor_wait_for_learner(int64_t global_steps_temp) {
     pthread_mutex_lock(&update_steps_mutex);
-    auto num_updates_temp = num_updates;
-    while (num_updates_temp < (global_steps_temp - update_after) * update_per_step) {
+    while (num_updates < (global_steps_temp - update_after) * update_per_step) {
         // conditional wait
-        num_updates_temp = num_updates;
         pthread_cond_wait(&update_steps_cond, &update_steps_mutex);
     }
     pthread_mutex_unlock(&update_steps_mutex);
-    return num_updates_temp;
 }
 
 void rlu::trainer::OffPolicyTrainerParallel::log(int64_t global_steps_temp, int64_t num_updates_temp) {
@@ -484,4 +481,29 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_wait_to_start() {
         pthread_cond_wait(&learner_cond, &global_steps_mutex);
     }
     pthread_mutex_unlock(&global_steps_mutex);
+}
+
+void rlu::trainer::OffPolicyTrainerParallel::wake_up_actor() {
+    pthread_mutex_lock(&update_steps_mutex);
+    pthread_cond_broadcast(&update_steps_cond);
+    pthread_mutex_unlock(&update_steps_mutex);
+}
+
+void rlu::trainer::OffPolicyTrainerParallel::wake_up_learner() {
+    // wake up the learner threads
+    pthread_mutex_lock(&global_steps_mutex);
+    if (total_steps >= update_after) {
+        pthread_cond_broadcast(&learner_cond);
+    }
+    pthread_mutex_unlock(&global_steps_mutex);
+}
+
+int64_t rlu::trainer::OffPolicyTrainerParallel::get_update_steps(bool increment) {
+    pthread_mutex_lock(&update_steps_mutex);
+    if (increment) {
+        num_updates += 1;
+    }
+    int64_t temp = num_updates;
+    pthread_mutex_unlock(&update_steps_mutex);
+    return temp;
 }

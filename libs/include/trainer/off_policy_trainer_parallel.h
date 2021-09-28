@@ -47,6 +47,22 @@ namespace rlu::trainer {
          */
         int64_t get_global_steps(bool increment);
 
+        int64_t get_update_steps(bool increment);
+
+        void actor_wait_for_learner(int64_t global_steps_temp);
+
+        void wake_up_actor();
+
+        void wake_up_learner();
+
+        int64_t get_actor_index();
+
+        int64_t get_learner_index();
+
+        void learner_wait_to_start();
+
+        void log(int64_t global_steps_temp, int64_t num_updates_temp);
+
         virtual void actor_fn_internal();
 
         virtual void learner_fn_internal();
@@ -98,26 +114,6 @@ namespace rlu::trainer {
          * Aggregate the gradients
          */
         str_to_tensor_list aggregate_grads();
-
-        int64_t actor_wait_for_learner(int64_t global_steps_temp);
-
-        void wake_up_actor(int64_t global_steps_temp) {
-            pthread_mutex_lock(&update_steps_mutex);
-            num_updates += 1;
-            // wait up the actors threads if any
-            if (num_updates >= (global_steps_temp - update_after) * update_per_step) {
-                pthread_cond_broadcast(&update_steps_cond);
-            }
-            pthread_mutex_unlock(&update_steps_mutex);
-        }
-
-        int64_t get_actor_index();
-
-        int64_t get_learner_index();
-
-        void learner_wait_to_start();
-
-        void log(int64_t global_steps_temp, int64_t num_updates_temp);
 
     };
 }
