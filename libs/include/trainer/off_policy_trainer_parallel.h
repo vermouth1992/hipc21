@@ -75,6 +75,8 @@ namespace rlu::trainer {
         std::vector<std::shared_ptr<Gym::Environment>> envs;
         // mutexes
         pthread_mutex_t global_steps_mutex{};
+        pthread_mutex_t update_steps_mutex{};
+        pthread_cond_t update_steps_cond{};
         std::vector<pthread_mutex_t> actor_mutexes;
         pthread_mutex_t test_actor_mutex{};
         std::vector<pthread_mutex_t> temp_buffer_mutex;

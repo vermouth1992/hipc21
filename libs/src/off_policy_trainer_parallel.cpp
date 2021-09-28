@@ -79,6 +79,10 @@ int64_t rlu::trainer::OffPolicyTrainerParallel::get_global_steps(bool increment)
         total_steps += 1;
     }
     global_steps_temp = total_steps;
+    // wake up the learner threads
+    if (global_steps_temp >= update_after) {
+        pthread_cond_broadcast(&learner_cond);
+    }
     pthread_mutex_unlock(&global_steps_mutex);
     return global_steps_temp;
 }
@@ -111,6 +115,18 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         int64_t global_steps_temp = this->get_global_steps(true);
 
         spdlog::debug("Current global step {}", global_steps_temp);
+
+        // TODO: make sure the actor and the target approximately meets the update_per_step
+        // If the actors are too fast, wait for the learner.
+        // If the actors are slow, simply increase the number of actors
+        pthread_mutex_lock(&update_steps_mutex);
+        auto num_updates_temp = num_updates;
+        while (num_updates_temp < (global_steps_temp - update_after) * update_per_step) {
+            // conditional wait
+            pthread_cond_wait(&update_steps_cond, &update_steps_mutex);
+        }
+        pthread_mutex_unlock(&update_steps_mutex);
+
         // create a new thread for testing and logging
         if (global_steps_temp % steps_per_epoch == 0) {
             // perform logging
@@ -118,8 +134,8 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             logger->log_tabular("Epoch", epoch);
             logger->log_tabular("EpRet", std::nullopt, true);
             logger->log_tabular("EpLen", std::nullopt, false, true);
-            logger->log_tabular("TotalEnvInteracts", (float) (epoch * steps_per_epoch));
-            logger->log_tabular("GradientSteps", (float) num_updates);
+            logger->log_tabular("TotalEnvInteracts", (float) global_steps_temp);
+            logger->log_tabular("GradientSteps", (float) num_updates_temp);
 
             // add this line if the learning is implemented.
             agent->log_tabular();
@@ -255,111 +271,122 @@ void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
 
     spdlog::info("Running learner thread {}", index);
     int64_t max_global_steps = epochs * steps_per_epoch;
+    int64_t global_steps_temp;
 
+    pthread_mutex_lock(&global_steps_mutex);
+    global_steps_temp = total_steps;
+    while (global_steps_temp < update_after) {
+        pthread_cond_wait(&learner_cond, &global_steps_mutex);
+    }
+    pthread_mutex_unlock(&global_steps_mutex);
+
+    // start learning
     while (true) {
         // get global steps
-        int64_t global_steps_temp = this->get_global_steps(false);
+        global_steps_temp = this->get_global_steps(false);
         if (global_steps_temp >= max_global_steps) {
             break;
         }
-        // TODO: use condition variable to release the CPU before update_after
-        if (global_steps_temp >= update_after) {
-            bool update_target = num_updates % policy_delay == 0;
-            // sample a batch of data.
-            // generate index
-            // TODO: when the replay buffer reaches the capacity, we need to make sure the idx is not written by the new data. Or the new priority doesn't have to update
-            spdlog::debug("Before generating index");
-            pthread_mutex_lock(&buffer_mutex);
-            auto idx = buffer->generate_idx();
-            // retrieve the actual data
-            auto data = buffer->operator[](idx);
-            pthread_mutex_unlock(&buffer_mutex);
-            // compute the gradients
-            spdlog::debug("Before compute grad");
 
-            std::optional<torch::Tensor> importance_weights;
-            if (data.contains("weights")) {
-                importance_weights = data["weights"].to(device);
-                auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
-                if (tensorIsNan) {
-                    throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
-                                                         importance_weights.value()));
-                }
-                spdlog::debug("importance weights min {}, max {}",
-                              torch::min(importance_weights.value()).item<float>(),
-                              torch::max(importance_weights.value()).item<float>());
+        bool update_target = num_updates % policy_delay == 0;
+        // sample a batch of data.
+        // generate index
+        // TODO: when the replay buffer reaches the capacity, we need to make sure the idx is not written by the new data. Or the new priority doesn't have to update
+        spdlog::debug("Before generating index");
+        pthread_mutex_lock(&buffer_mutex);
+        auto idx = buffer->generate_idx();
+        // retrieve the actual data
+        auto data = buffer->operator[](idx);
+        pthread_mutex_unlock(&buffer_mutex);
+        // compute the gradients
+        spdlog::debug("Before compute grad");
+
+        std::optional<torch::Tensor> importance_weights;
+        if (data.contains("weights")) {
+            importance_weights = data["weights"].to(device);
+            auto tensorIsNan = at::isnan(importance_weights.value()).any().item<bool>();
+            if (tensorIsNan) {
+                throw std::runtime_error(fmt::format("Importance weights contain NaN. {}",
+                                                     importance_weights.value()));
             }
+            spdlog::debug("importance weights min {}, max {}",
+                          torch::min(importance_weights.value()).item<float>(),
+                          torch::max(importance_weights.value()).item<float>());
+        }
 
-            auto output = agent->compute_grad(data["obs"].to(device),
-                                              data["act"].to(device),
-                                              data["next_obs"].to(device),
-                                              data["rew"].to(device),
-                                              data["done"].to(device),
-                                              importance_weights,
-                                              update_target);
-            auto local_grads = output.first;
-            // update
-            spdlog::debug("After compute grad");
-            // store the local grad in the shared memory
-            grads.at(index) = std::make_shared<str_to_tensor_list>(local_grads);
+        auto output = agent->compute_grad(data["obs"].to(device),
+                                          data["act"].to(device),
+                                          data["next_obs"].to(device),
+                                          data["rew"].to(device),
+                                          data["done"].to(device),
+                                          importance_weights,
+                                          update_target);
+        auto local_grads = output.first;
+        // update
+        spdlog::debug("After compute grad");
+        // store the local grad in the shared memory
+        grads.at(index) = std::make_shared<str_to_tensor_list>(local_grads);
 
-            // atomically increase the done flag
-            pthread_mutex_lock(&learner_barrier);
-            num_finished_learners += 1;
-            if (num_finished_learners == this->get_num_learners()) {
-                // last thread aggregate the gradients, otherwise, conditional wait for the done signal
-                auto aggregated_grads = this->aggregate_grads();
-                // set the gradients
-                agent->set_grad(aggregated_grads);
+        // atomically increase the done flag
+        pthread_mutex_lock(&learner_barrier);
+        num_finished_learners += 1;
+        if (num_finished_learners == this->get_num_learners()) {
+            // last thread aggregate the gradients, otherwise, conditional wait for the done signal
+            auto aggregated_grads = this->aggregate_grads();
+            // set the gradients
+            agent->set_grad(aggregated_grads);
 
 
 //                // acquire all the inference lock
 //                for (auto &agent_mutex: agent_mutexes) {
 //                    pthread_mutex_lock(&agent_mutex);
 //                }
-                // optimizer step
-                agent->update_step(update_target);
+            // optimizer step
+            agent->update_step(update_target);
 //                for (auto &agent_mutex: agent_mutexes) {
 //                    pthread_mutex_unlock(&agent_mutex);
 //                }
 
-                num_updates += 1;
-                // atomically copy weights to actors and test_actors
-
-                // copy the weight of the agent to CPU
-
-
-                for (auto &m: actor_mutexes) {
-                    pthread_mutex_lock(&m);
-                }
-                // TODO: need to optimize for PCIe transfer. First transfer to a CPU agent.
-
-                // Then, perform atomic weight copy
-                pthread_mutex_lock(&test_actor_mutex);
-                rlu::functional::hard_update(*actor, *agent);
-                pthread_mutex_unlock(&test_actor_mutex);
-
-                for (auto &m: actor_mutexes) {
-                    pthread_mutex_unlock(&m);
-                }
-                num_finished_learners = 0;
-                // broadcast
-                pthread_cond_broadcast(&learner_cond);
-            } else {
-                // wait the aggregator
-                pthread_cond_wait(&learner_cond, &learner_barrier);
+            pthread_mutex_lock(&update_steps_mutex);
+            num_updates += 1;
+            // wait up the actors threads if any
+            if (num_updates >= (global_steps_temp - update_after) * update_per_step) {
+                pthread_cond_broadcast(&update_steps_cond);
             }
+            pthread_mutex_unlock(&update_steps_mutex);
+            // atomically copy weights to actors and test_actors
 
-            output.second["idx"] = idx;
-            pthread_mutex_lock(&buffer_mutex);
-            this->buffer->post_process(output.second);
-            pthread_mutex_unlock(&buffer_mutex);
+            // copy the weight of the agent to CPU
 
-            pthread_mutex_unlock(&learner_barrier);
+
+            for (auto &m: actor_mutexes) {
+                pthread_mutex_lock(&m);
+            }
+            // TODO: need to optimize for PCIe transfer. First transfer to a CPU agent.
+
+            // Then, perform atomic weight copy
+            pthread_mutex_lock(&test_actor_mutex);
+            rlu::functional::hard_update(*actor, *agent);
+            pthread_mutex_unlock(&test_actor_mutex);
+
+            for (auto &m: actor_mutexes) {
+                pthread_mutex_unlock(&m);
+            }
+            num_finished_learners = 0;
+            // broadcast
+            pthread_cond_broadcast(&learner_cond);
         } else {
-            // wait in a condition variable
-
+            // wait the aggregator
+            pthread_cond_wait(&learner_cond, &learner_barrier);
         }
+
+        output.second["idx"] = idx;
+        pthread_mutex_lock(&buffer_mutex);
+        this->buffer->post_process(output.second);
+        pthread_mutex_unlock(&buffer_mutex);
+
+        pthread_mutex_unlock(&learner_barrier);
+
     }
     // wait for the logger
     sleep(1);
