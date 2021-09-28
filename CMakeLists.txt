@@ -13,7 +13,12 @@ get_filename_component(CONDA_PATH ${Python_EXECUTABLE}/../../ ABSOLUTE)
 message(STATUS "anaconda path ${CONDA_PATH}")
 message(STATUS "Found Python site-package library at ${Python_SITELIB}")
 
-set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
+if (DEFINED ENV{LIBTORCH})
+    set(LIBTORCH $ENV{LIBTORCH}/share/cmake)
+else()
+    set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
+    message(WARNING "Using Libtorch from conda. The google test may not be working correctly")
+endif()
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 
