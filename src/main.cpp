@@ -84,6 +84,8 @@ int main(int argc, char **argv) {
         int logging_level = result["logging_level"].as<int>();
         spdlog::set_level(static_cast<spdlog::level::level_enum>(logging_level));
         torch::manual_seed(result["seed"].as<int64_t>());
+        // to see the real performance benefits using multithreading, it is crucial to only use single thread Pytorch
+        torch::set_num_threads(1);
         // device name
         std::string algorithm(result["algorithm"].as<std::string>());
         std::string device_name(result["device"].as<std::string>());

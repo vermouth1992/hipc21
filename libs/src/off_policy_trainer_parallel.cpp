@@ -344,14 +344,22 @@ void rlu::trainer::OffPolicyTrainerParallel::start_learner_threads() {
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::actor_fn(void *param_) {
-    auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
-    This->actor_fn_internal();
+    try {
+        auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
+        This->actor_fn_internal();
+    } catch (const std::exception &e) {
+        fprintf(stderr, "ERROR when running the actor: %s\n", e.what());
+    }
     return nullptr;
 }
 
 void *rlu::trainer::OffPolicyTrainerParallel::learner_fn(void *param_) {
-    auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
-    This->learner_fn_internal();
+    try {
+        auto *This = static_cast<OffPolicyTrainerParallel *>(param_);
+        This->learner_fn_internal();
+    } catch (const std::exception &e) {
+        fprintf(stderr, "ERROR when running the learner: %s\n", e.what());
+    }
     return nullptr;
 }
 
