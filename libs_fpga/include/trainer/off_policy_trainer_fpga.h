@@ -76,6 +76,12 @@ namespace rlu::trainer {
 
             this->buffer = std::make_shared<rlu::replay_buffer::PrioritizedReplayBuffer<rlu::replay_buffer::SegmentTreeFPGA>>(
                     replay_size, data_spec, batch_size, 0.8);
+            for (size_t i = 0; i < this->get_num_actors(); i++) {
+                this->temp_buffer.push_back(std::make_shared<replay_buffer::UniformReplayBuffer>(
+                        batch_size, this->buffer->get_data_spec(), 1));
+                this->temp_buffer_mutex.emplace_back();
+                this->agent_mutexes.emplace_back();
+            }
         }
 
 
