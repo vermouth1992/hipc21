@@ -162,6 +162,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
 
         // try to acquire the lock. If failed, try to get the next one
         size_t lock_index = 0;
+        spdlog::debug("before getting mutex");
         while (true) {
             int ret = pthread_mutex_trylock(&this->temp_buffer_mutex.at(lock_index));
             if (ret == 0) {
@@ -171,8 +172,9 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
             }
         }
 
+        spdlog::debug("before add_single(single_data)");
         this->temp_buffer.at(lock_index)->add_single(single_data);
-
+        spdlog::debug("add_single(single_data)");
         if (this->temp_buffer.at(lock_index)->full()) {
             // if the temporary buffer is full, compute the priority and set
             auto storage = this->temp_buffer.at(lock_index)->get_storage();
@@ -219,8 +221,8 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
 
 void rlu::trainer::OffPolicyTrainerParallel::learner_fn_internal() {
     auto index = this->get_learner_index();
-    spdlog::info("Running learner thread {}", index);
     this->learner_wait_to_start();
+    spdlog::info("Running learner thread {}", index);
 
     int64_t max_global_steps = epochs * steps_per_epoch;
     // start learning
