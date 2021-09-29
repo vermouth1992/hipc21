@@ -22,12 +22,12 @@ namespace rlu::replay_buffer {
 
         // query the FPGA about the size of the segment tree.
         [[nodiscard]] int64_t size() const override {
-            throw NotImplemented();
+            throw NotImplemented("SegmentTreeFPGA::size");
         }
 
         // query the FPGA about the weights in the segment tree
         torch::Tensor operator[](__attribute__ ((unused)) const torch::Tensor &idx) const override {
-            throw NotImplemented();
+            return torch::zeros_like(idx);
         }
 
         void set(const torch::Tensor &idx, const torch::Tensor &value) override {
@@ -45,15 +45,16 @@ namespace rlu::replay_buffer {
 
         [[nodiscard]] float reduce(__attribute__ ((unused)) int64_t start,
                                    __attribute__ ((unused)) int64_t end) const override {
-            throw NotImplemented();
+            throw NotImplemented("SegmentTreeFPGA::reduce");
         }
 
         [[nodiscard]] float reduce() const override {
-            throw NotImplemented();
+            return 1.;
+            // throw NotImplemented("SegmentTreeFPGA::reduce");
         }
 
         [[nodiscard]] torch::Tensor get_prefix_sum_idx(__attribute__ ((unused)) torch::Tensor value) const override {
-            throw NotImplemented();
+            throw NotImplemented("SegmentTreeFPGA::get_prefix_sum_idx");
         }
  
         [[nodiscard]] torch::Tensor sample_idx(int64_t batch_size) const override { //Int32???????

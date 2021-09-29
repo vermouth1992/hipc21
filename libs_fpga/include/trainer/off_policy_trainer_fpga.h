@@ -98,90 +98,97 @@ namespace rlu::trainer {
                 if (global_steps_temp >= max_global_steps) {
                     break;
                 }
-                if (global_steps_temp >= update_after) {
-                    // step 1: query FPGA about idx
-                    auto idx = buffer->generate_idx();
-                    // retrieve the actual data
-                    auto data = buffer->operator[](idx);
-                    // =========================send the data to the FPGA and waits for the FPGA to complete and send back logging data including
-                    // the QVals (batch) and the loss of Q (scalar)
-                    std::cout << "Host: init input states..." << std::endl;
-                    
-                    for (jj = 0; jj < BATCHS; jj++) {   
-                        for (j = 0; j < L1; j++) {
-                            for (i = 0; i < BSIZE; i++) {
-                            rlu::fpga::In_rows[L1*jj+j].a[i] = data["obs"].index({(jj*BSIZE+i)*L1+j}).item<float>(); //[jj*BSIZE+i][j];   //?????????????????
-                            rlu::fpga::In_rows_snt[L1*jj+j].a[i] = data["next_obs"].index({(jj*BSIZE+i)*L1+j}).item<float>();  //[jj*BSIZE+i][j];  //?????????????????
-                            // printf("%f ",In_rows[j].a[i]);         
-                            // printf("%f ",In_rows_snt[j].a[i]);
-                            }
+                // if (global_steps_temp >= update_after) {
+                spdlog::debug("In loop");
+                // step 1: query FPGA about idx
+                auto idx = buffer->generate_idx();
+                spdlog::debug("generate_idx");
+                // retrieve the actual data
+                auto data = buffer->operator[](idx);
+                spdlog::debug("operator[]");
+                // =========================send the data to the FPGA and waits for the FPGA to complete and send back logging data including
+                // the QVals (batch) and the loss of Q (scalar)
+                // std::cout << "Host: init input states..." << std::endl;
+                spdlog::debug("Host: init input states...");
+                
+                for (jj = 0; jj < BATCHS; jj++) {   
+                    for (j = 0; j < L1; j++) {
+                        for (i = 0; i < BSIZE; i++) {
+                        rlu::fpga::In_rows[L1*jj+j].a[i] = data["obs"].index({(jj*BSIZE+i)*L1+j}).item<float>(); //[jj*BSIZE+i][j];   //?????????????????
+                        rlu::fpga::In_rows_snt[L1*jj+j].a[i] = data["next_obs"].index({(jj*BSIZE+i)*L1+j}).item<float>();  //[jj*BSIZE+i][j];  //?????????????????
+                        // printf("%f ",In_rows[j].a[i]);         
+                        // printf("%f ",In_rows_snt[j].a[i]);
                         }
                     }
-
-                    printf("\nHost: Init input reward/action/done content...\n");
-
-                    for (jj = 0; jj < BATCHS; jj++) {   
-                        for (i = 0; i < BSIZE; i++) {
-                        // printf("\njj,i:%d,%d\n",jj,i);
-                            rlu::fpga::In_actions[jj].a[i] = data["act"].index({jj*BSIZE+i}).item<float>();
-                            rlu::fpga::In_rewards[jj].a[i] = data["rew"].index({jj*BSIZE+i}).item<float>();
-                            rlu::fpga::In_dones[jj].a[i] = data["done"].index({jj*BSIZE+i}).item<float>();
-                            // printf("%d ",In_actions[jj].a[i]);
-                        }
-                    }                    
-                    cl::Kernel krnl_top(rlu::fpga::program, "learners_top:{top_1}");
-                    cl::Kernel krnl_tree(rlu::fpga::program, "Top_tree", &rlu::fpga::err); // Replay Update (Parallel with train):
-                    rlu::fpga::gamma=0.99; //actor->gamma?????????????????
-                    rlu::fpga::alpha=0.1; //tau????????????????
-                    rlu::fpga::wsync = 1; //wsync mechanism??????????????????????
-                    krnl_top.setArg(0, rlu::fpga::in1_buf);
-                    krnl_top.setArg(1, rlu::fpga::in2_buf);
-                    krnl_top.setArg(2, rlu::fpga::in3_buf);
-                    krnl_top.setArg(3, rlu::fpga::in4_buf);
-                    krnl_top.setArg(4, rlu::fpga::gamma);
-                    krnl_top.setArg(5, rlu::fpga::alpha);
-                    krnl_top.setArg(6, rlu::fpga::in5_buf);
-                    krnl_top.setArg(7, rlu::fpga::out1_buf);
-                    krnl_top.setArg(8, rlu::fpga::out2_buf);
-                    krnl_top.setArg(9, rlu::fpga::out3_buf);
-                    krnl_top.setArg(10, rlu::fpga::out4_buf); //bias2, float*L3
-                    krnl_top.setArg(11, rlu::fpga::wsync);
-                    krnl_top.setArg(12, rlu::fpga::out5_buf); //Logging Qs  float*BATCHS*BSIZE
-                    krnl_top.setArg(13, rlu::fpga::out6_buf); //Logging Loss  float*BATCHS*BSIZE
-
-                    rlu::fpga::insert_signal_in = 0;
-                    rlu::fpga::update_signal=1;
-                    rlu::fpga::sample_signal = 0;
-                    rlu::fpga::load_seed=0;
-                    krnl_tree.setArg(0, rlu::fpga::insert_signal_in);
-                    krnl_tree.setArg(1, rlu::fpga::insind_buf);
-                    krnl_tree.setArg(2, rlu::fpga::inpn_buf);
-                    krnl_tree.setArg(3, rlu::fpga::update_signal);
-                    krnl_tree.setArg(5, rlu::fpga::sample_signal);
-                    krnl_tree.setArg(6, rlu::fpga::load_seed);
-                    krnl_tree.setArg(7, rlu::fpga::out_buf);
-                    
-                    rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::in1_buf,rlu::fpga::in2_buf,rlu::fpga::in3_buf,rlu::fpga::in4_buf,rlu::fpga::in5_buf}, 0);
-                    rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::insind_buf,rlu::fpga::inpn_buf}, 0 /* 0 means from host*/);
-                    rlu::fpga::q.finish();
-                    // printf("sent data\n");
-                    rlu::fpga::q.enqueueTask(krnl_top);
-                    rlu::fpga::q.enqueueTask(krnl_tree);
-                    rlu::fpga::q.finish();
-                    // printf("enqueue\n");
-                    rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::out1_buf,rlu::fpga::out2_buf,rlu::fpga::out3_buf,rlu::fpga::out4_buf,rlu::fpga::out5_buf,rlu::fpga::out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-                    // printf("executed learner kernel with weight init\n");
-                    // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-                    rlu::fpga::q.finish(); //(??? Sequential after Insert or need barrier ???):
-                    printf("q.finish\n");
-
-
-                    // increase the number of gradient steps ?????????????????????=====================
-
-                    // copy the weights from FPGA to the CPU
-                    synchronize_weights();
                 }
+
+                // printf("\nHost: Init input reward/action/done content...\n");
+                spdlog::debug("Host: Init input reward/action/done content...");
+
+                for (jj = 0; jj < BATCHS; jj++) {   
+                    for (i = 0; i < BSIZE; i++) {
+                    // printf("\njj,i:%d,%d\n",jj,i);
+                        rlu::fpga::In_actions[jj].a[i] = data["act"].index({jj*BSIZE+i}).item<float>();
+                        rlu::fpga::In_rewards[jj].a[i] = data["rew"].index({jj*BSIZE+i}).item<float>();
+                        rlu::fpga::In_dones[jj].a[i] = data["done"].index({jj*BSIZE+i}).item<float>();
+                        // printf("%d ",In_actions[jj].a[i]);
+                    }
+                }                    
+                cl::Kernel krnl_top(rlu::fpga::program, "learners_top:{top_1}");
+                cl::Kernel krnl_tree(rlu::fpga::program, "Top_tree", &rlu::fpga::err); // Replay Update (Parallel with train):
+                rlu::fpga::gamma=0.99; //actor->gamma?????????????????
+                rlu::fpga::alpha=0.1; //tau????????????????
+                rlu::fpga::wsync = 1; //wsync mechanism??????????????????????
+                krnl_top.setArg(0, rlu::fpga::in1_buf);
+                krnl_top.setArg(1, rlu::fpga::in2_buf);
+                krnl_top.setArg(2, rlu::fpga::in3_buf);
+                krnl_top.setArg(3, rlu::fpga::in4_buf);
+                krnl_top.setArg(4, rlu::fpga::gamma);
+                krnl_top.setArg(5, rlu::fpga::alpha);
+                krnl_top.setArg(6, rlu::fpga::in5_buf);
+                krnl_top.setArg(7, rlu::fpga::out1_buf);
+                krnl_top.setArg(8, rlu::fpga::out2_buf);
+                krnl_top.setArg(9, rlu::fpga::out3_buf);
+                krnl_top.setArg(10, rlu::fpga::out4_buf); //bias2, float*L3
+                krnl_top.setArg(11, rlu::fpga::wsync);
+                krnl_top.setArg(12, rlu::fpga::out5_buf); //Logging Qs  float*BATCHS*BSIZE
+                krnl_top.setArg(13, rlu::fpga::out6_buf); //Logging Loss  float*BATCHS*BSIZE
+
+                rlu::fpga::insert_signal_in = 0;
+                rlu::fpga::update_signal=1;
+                rlu::fpga::sample_signal = 0;
+                rlu::fpga::load_seed=0;
+                krnl_tree.setArg(0, rlu::fpga::insert_signal_in);
+                krnl_tree.setArg(1, rlu::fpga::insind_buf);
+                krnl_tree.setArg(2, rlu::fpga::inpn_buf);
+                krnl_tree.setArg(3, rlu::fpga::update_signal);
+                krnl_tree.setArg(5, rlu::fpga::sample_signal);
+                krnl_tree.setArg(6, rlu::fpga::load_seed);
+                krnl_tree.setArg(7, rlu::fpga::out_buf);
+                
+                rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::in1_buf,rlu::fpga::in2_buf,rlu::fpga::in3_buf,rlu::fpga::in4_buf,rlu::fpga::in5_buf}, 0);
+                rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::insind_buf,rlu::fpga::inpn_buf}, 0 /* 0 means from host*/);
+                spdlog::debug("Learner data Transferred to device");
+                rlu::fpga::q.finish();
+                // printf("sent data\n");
+                rlu::fpga::q.enqueueTask(krnl_top);
+                rlu::fpga::q.enqueueTask(krnl_tree);
+                spdlog::debug("Learner enqued");
+                rlu::fpga::q.finish();
+                // printf("enqueue\n");
+                rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::out1_buf,rlu::fpga::out2_buf,rlu::fpga::out3_buf,rlu::fpga::out4_buf,rlu::fpga::out5_buf,rlu::fpga::out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+                // printf("executed learner kernel with weight init\n");
+                // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+                rlu::fpga::q.finish(); //(??? Sequential after Insert or need barrier ???):
+                spdlog::debug("Learner fn q.finish");
+
+
+                // increase the number of gradient steps ?????????????????????=====================
+
+                // copy the weights from FPGA to the CPU
+                synchronize_weights();
             }
+            // }
         }
 
     private:
