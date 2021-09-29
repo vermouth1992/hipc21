@@ -15,10 +15,12 @@ message(STATUS "Found Python site-package library at ${Python_SITELIB}")
 
 if (DEFINED ENV{LIBTORCH})
     set(LIBTORCH $ENV{LIBTORCH}/share/cmake)
-else()
+else ()
     set(LIBTORCH ${Python_SITELIB}/torch/share/cmake)
-    message(WARNING "Using Libtorch from conda. The google test may not be working correctly")
-endif()
+    if (LINUX)
+        message(WARNING "Using Libtorch from conda. The google test may not be working correctly")
+    endif (LINUX)
+endif ()
 
 set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 
