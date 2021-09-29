@@ -18,6 +18,7 @@ public:
     }
 
     void run_serial() {
+	torch::NoGradGuard no_grad;
         // serial version
         watcher.reset();
         watcher.start();
@@ -74,6 +75,7 @@ private:
     }
 
     void parallel_inference_thread() {
+	torch::NoGradGuard no_grad;
         torch::Tensor result = torch::zeros({batch_size, output_dim}).to(device);
         torch::Tensor input = torch::ones({batch_size, input_dim}).to(device);
         rlu::watcher::StopWatcher local_watcher;
@@ -88,6 +90,7 @@ private:
     }
 
     void parallel_inference_thread_v2(int index) {
+	torch::NoGradGuard no_grad;
         torch::Tensor result = torch::zeros({batch_size, output_dim}).to(device);
         torch::Tensor input = torch::ones({batch_size, input_dim}).to(device);
         rlu::watcher::StopWatcher local_watcher;
@@ -103,9 +106,9 @@ private:
 
     rlu::watcher::StopWatcher watcher;
     int64_t input_dim = 11;
-    int64_t num_threads = 4;
+    int64_t num_threads = 3;
     int64_t batch_size = 64;
-    int64_t num_iterations = 100000;
+    int64_t num_iterations = 300000;
     int64_t output_dim = 3;
     int64_t mlp_hidden = 64;
     torch::Device device = torch::kCPU;
@@ -115,6 +118,7 @@ private:
 
 TEST(parallel_torch, parallel_inference) {
     torch::manual_seed(1);
+    torch::set_num_threads(1);
     BenchmarkParallelInference benchmark;
     benchmark.run_parallel();
     benchmark.run_serial();
