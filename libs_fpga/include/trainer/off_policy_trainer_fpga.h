@@ -90,6 +90,10 @@ namespace rlu::trainer {
             // we assume there is only one learner here.
             spdlog::info("Learner starts");
             int64_t max_global_steps = epochs * steps_per_epoch;
+
+            cl::Kernel krnl_top(rlu::fpga::program, "learners_top:{top_1}");
+            cl::Kernel krnl_tree(rlu::fpga::program, "Top_tree", &rlu::fpga::err); // Replay Update (Parallel with train):
+
             while (true) {
                 // get global steps
                 int64_t global_steps_temp = this->get_global_steps(false);
@@ -143,13 +147,8 @@ namespace rlu::trainer {
                     }
                 }
 
-                // watcher.lap();
-                // std::cout << "Elapsed time is " << watcher.seconds() << std::endl;
-
-                cl::Kernel krnl_top(rlu::fpga::program, "learners_top:{top_1}");
-                cl::Kernel krnl_tree(rlu::fpga::program, "Top_tree", &rlu::fpga::err); // Replay Update (Parallel with train):
-                rlu::fpga::gamma=0.99; //actor->gamma?????????????????
-                rlu::fpga::alpha=0.1; //tau????????????????
+                rlu::fpga::gamma = 0.99; //actor->gamma?????????????????
+                rlu::fpga::alpha = 0.1; //tau????????????????
                 rlu::fpga::wsync = 1; //wsync mechanism??????????????????????
                 krnl_top.setArg(0, rlu::fpga::in1_buf);
                 krnl_top.setArg(1, rlu::fpga::in2_buf);
@@ -167,7 +166,7 @@ namespace rlu::trainer {
                 krnl_top.setArg(13, rlu::fpga::out6_buf); //Logging Loss  float*BATCHS*BSIZE
 
                 rlu::fpga::insert_signal_in = 0;
-                rlu::fpga::update_signal=1;
+                rlu::fpga::update_signal = 1;
                 rlu::fpga::sample_signal = 0;
                 rlu::fpga::load_seed=0;
                 krnl_tree.setArg(0, rlu::fpga::insert_signal_in);
@@ -193,6 +192,9 @@ namespace rlu::trainer {
                 // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
                 rlu::fpga::q.finish(); //(??? Sequential after Insert or need barrier ???):
                 spdlog::debug("Learner fn q.finish");
+
+                // watcher.lap();
+                // std::cout << "Elapsed time is " << watcher.seconds() << std::endl;
 
                 // increase the number of gradient steps ?????????????????????=====================
 
