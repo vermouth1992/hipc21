@@ -165,17 +165,15 @@ namespace rlu::logger {
                 m_output_file << s << std::endl;
             }
         }
-        // print to console
-        for (int i = 0; i < n_slashes; i++) {
-            fmt::print("-");
-        }
-        fmt::print("\n");
+        std::string output;
+        output.append(n_slashes, '-');
+        output.append(1, '\n');
         for (unsigned long i = 0; i < m_log_headers.size(); i++) {
             auto key = m_log_headers.at(i);
             auto val = m_log_current_row.at(key);
             // format val
             auto val_str = fmt::format("{:8.3g}", val);
-            fmt::print("| {:>{}} | {:>15} |\n", key, max_key_len, val_str);
+            output += fmt::format("| {:>{}} | {:>15} |\n", key, max_key_len, val_str);
             if (!m_output_dir.empty()) {
                 m_output_file << val;
                 if (i != m_log_headers.size() - 1) {
@@ -187,10 +185,11 @@ namespace rlu::logger {
             m_output_file << std::endl;
             m_output_file.flush();
         }
-        for (int i = 0; i < n_slashes; i++) {
-            fmt::print("-");
-        }
-        fmt::print("\n");
+        output.append(n_slashes, '-');
+        output.append(1, '\n');
+
+        // print to console
+        fmt::print("{}", output);
 
         // write to file
         m_log_current_row.clear();
