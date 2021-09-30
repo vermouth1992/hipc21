@@ -29,7 +29,7 @@ namespace rlu::replay_buffer {
 
         // query the FPGA about the weights in the segment tree
         torch::Tensor operator[](__attribute__ ((unused)) const torch::Tensor &idx) const override {
-            return torch::zeros_like(idx);
+            return torch::ones_like(idx);
         }
 
         void set(const torch::Tensor &idx, const torch::Tensor &value) override {
@@ -57,14 +57,14 @@ namespace rlu::replay_buffer {
             krnl_tree6.setArg(5, rlu::fpga::sample_signal);
             krnl_tree6.setArg(6, rlu::fpga::load_seed);
             krnl_tree6.setArg(7, rlu::fpga::out_buf);
-            spdlog::info("Replay Insert: setArg done");
+            spdlog::debug("Replay Insert: setArg done");
             rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::insind_buf,rlu::fpga::inpn_buf}, 0);
             rlu::fpga::q.finish();
-            spdlog::info("Replay Insert: data transfer to device");
+            spdlog::debug("Replay Insert: data transfer to device");
             rlu::fpga::q.enqueueTask(krnl_tree6);
             rlu::fpga::q.finish();
             // rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-            spdlog::info("Replay Insert: enqueue done");
+            spdlog::debug("Replay Insert: enqueue done");
 
         }
 
@@ -83,11 +83,13 @@ namespace rlu::replay_buffer {
         }
  
         [[nodiscard]] torch::Tensor sample_idx(int64_t batch_size) const override { //Int32???????
+            return torch::zeros({batch_size}, torch::TensorOptions().dtype(torch::kInt64));
+
             // TODO: this function must be implemented
             // cl::Kernel krnl_tree2(rlu::fpga::program, "Top_tree");
             // // Doing inser and sampling together in one kernel call
             // rlu::fpga::insert_signal_in = 0;
-            // rlu::fpga::update_signal=0;
+            // rlu::fpga::update_signal = 0;
             // rlu::fpga::sample_signal = 1;
             // rlu::fpga::load_seed = 1;
 
@@ -113,10 +115,7 @@ namespace rlu::replay_buffer {
             //     // sample_idx[i]=rlu::fpga::ind_o_out[i];
             //     ret_tensor.index_put_({i},rlu::fpga::ind_o_out[i]); 
             // } 
-            
-            // // return torch::zeros({batch_size}, torch::TensorOptions().dtype(torch::kInt64));
             // return ret_tensor;
-            return torch::zeros({batch_size}, torch::TensorOptions().dtype(torch::kInt64));
         }
 
     };
