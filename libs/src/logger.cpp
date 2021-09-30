@@ -244,7 +244,9 @@ namespace rlu::logger {
             for (const auto &it: stats) {
                 Logger::log_tabular(it.first + key, it.second);
             }
-            m_epoch_dict[key].clear();
+            if (m_epoch_dict.contains(key)) {
+                m_epoch_dict.at(key).clear();
+            }
         }
         pthread_mutex_unlock(&mutex);
     }
