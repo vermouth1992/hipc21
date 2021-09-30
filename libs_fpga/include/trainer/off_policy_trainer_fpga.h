@@ -99,23 +99,28 @@ namespace rlu::trainer {
                     break;
                 }
                 // if (global_steps_temp >= update_after) {
-                spdlog::debug("In loop");
+                spdlog::info("In loop");
                 // step 1: query FPGA about idx
+                pthread_mutex_lock(&buffer_mutex);
                 auto idx = buffer->generate_idx();
-                spdlog::debug("generate_idx");
+                spdlog::info("generate_idx");
+
                 // retrieve the actual data
                 auto data = buffer->operator[](idx);
-                spdlog::debug("operator[]");
+                spdlog::info("operator[]");
+                pthread_mutex_unlock(&buffer_mutex);
                 // =========================send the data to the FPGA and waits for the FPGA to complete and send back logging data including
                 // the QVals (batch) and the loss of Q (scalar)
                 // std::cout << "Host: init input states..." << std::endl;
-                spdlog::debug("Host: init input states...");
+                spdlog::info("Host: init input states...");
                 
+                std::cout<<"Data[obs].size():"<< data["obs"].sizes() <<"\n";
+                std::cout<<"Data[obs].size():"<< data["next_obs"].sizes() <<"\n";
                 for (jj = 0; jj < BATCHS; jj++) {   
                     for (j = 0; j < L1; j++) {
                         for (i = 0; i < BSIZE; i++) {
-                        rlu::fpga::In_rows[L1*jj+j].a[i] = data["obs"].index({(jj*BSIZE+i)*L1+j}).item<float>(); //[jj*BSIZE+i][j];   //?????????????????
-                        rlu::fpga::In_rows_snt[L1*jj+j].a[i] = data["next_obs"].index({(jj*BSIZE+i)*L1+j}).item<float>();  //[jj*BSIZE+i][j];  //?????????????????
+                        rlu::fpga::In_rows[L1*jj+j].a[i] = data["obs"].index({(jj*BSIZE+i),j}).item<float>(); //[jj*BSIZE+i][j];   //?????????????????
+                        rlu::fpga::In_rows_snt[L1*jj+j].a[i] = data["next_obs"].index({(jj*BSIZE+i),j}).item<float>();  //[jj*BSIZE+i][j];  //?????????????????
                         // printf("%f ",In_rows[j].a[i]);         
                         // printf("%f ",In_rows_snt[j].a[i]);
                         }
@@ -123,7 +128,7 @@ namespace rlu::trainer {
                 }
 
                 // printf("\nHost: Init input reward/action/done content...\n");
-                spdlog::debug("Host: Init input reward/action/done content...");
+                spdlog::info("Host: Init input reward/action/done content...");
 
                 for (jj = 0; jj < BATCHS; jj++) {   
                     for (i = 0; i < BSIZE; i++) {
@@ -168,25 +173,27 @@ namespace rlu::trainer {
                 
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::in1_buf,rlu::fpga::in2_buf,rlu::fpga::in3_buf,rlu::fpga::in4_buf,rlu::fpga::in5_buf}, 0);
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::insind_buf,rlu::fpga::inpn_buf}, 0 /* 0 means from host*/);
-                spdlog::debug("Learner data Transferred to device");
+                spdlog::info("Learner data Transferred to device");
                 rlu::fpga::q.finish();
                 // printf("sent data\n");
                 rlu::fpga::q.enqueueTask(krnl_top);
                 rlu::fpga::q.enqueueTask(krnl_tree);
-                spdlog::debug("Learner enqued");
+                spdlog::info("Learner enqued");
                 rlu::fpga::q.finish();
                 // printf("enqueue\n");
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::out1_buf,rlu::fpga::out2_buf,rlu::fpga::out3_buf,rlu::fpga::out4_buf,rlu::fpga::out5_buf,rlu::fpga::out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
                 // printf("executed learner kernel with weight init\n");
                 // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
                 rlu::fpga::q.finish(); //(??? Sequential after Insert or need barrier ???):
-                spdlog::debug("Learner fn q.finish");
+                spdlog::info("Learner fn q.finish");
 
 
                 // increase the number of gradient steps ?????????????????????=====================
 
                 // copy the weights from FPGA to the CPU
-                synchronize_weights();
+                // synchronize_weights();
+                this->get_update_steps(true);
+                this->wake_up_actor();
             }
             // }
         }
