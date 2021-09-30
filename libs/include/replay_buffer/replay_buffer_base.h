@@ -40,8 +40,6 @@ namespace rlu::replay_buffer {
 
         str_to_tensor get() const;
 
-        const str_to_tensor &get_storage() const;
-
         str_to_dataspec get_data_spec() const;
 
         virtual void add_batch(str_to_tensor &data);

@@ -90,10 +90,6 @@ namespace rlu::replay_buffer {
         this->add_batch(data);
     }
 
-    const str_to_tensor &ReplayBuffer::get_storage() const {
-        return m_storage;
-    }
-
     bool ReplayBuffer::empty() const {
         return size() == 0;
     }
