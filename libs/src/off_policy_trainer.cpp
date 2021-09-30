@@ -161,7 +161,7 @@ namespace rlu::trainer {
 
         if (temp_buffer_local->full()) {
             // if the temporary buffer is full, compute the priority and set
-            auto storage = temp_buffer_local->get_storage();
+            auto storage = temp_buffer_local->get();
             auto priority = this->agent->compute_priority(storage.at("obs").to(device),
                                                           storage.at("act").to(device),
                                                           storage.at("next_obs").to(device),

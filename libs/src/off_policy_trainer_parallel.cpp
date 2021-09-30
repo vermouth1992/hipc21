@@ -104,12 +104,16 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         auto current_obs = s.observation;
 
         int64_t global_steps_temp = this->get_global_steps(true);
+        spdlog::debug("Before wake up learner");
         this->wake_up_learner();
 
+        spdlog::debug("Before get_update_steps");
         int64_t num_updates_temp = this->get_update_steps(false);
 
         // logging
+        spdlog::debug("Before logging");
         this->log(global_steps_temp, num_updates_temp);
+        spdlog::debug("After logging");
 
         // determine whether to break
         if (global_steps_temp >= max_global_steps) {
@@ -176,10 +180,12 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
         this->temp_buffer.at(lock_index)->add_single(single_data);
         spdlog::debug("add_single(single_data)");
         if (this->temp_buffer.at(lock_index)->full()) {
+            spdlog::debug("Temp buffer {} is full", lock_index);
             // if the temporary buffer is full, compute the priority and set
-            auto storage = this->temp_buffer.at(lock_index)->get_storage();
+            auto storage = this->temp_buffer.at(lock_index)->get();
             // compute the priority.
             // TODO: need mutex for inference
+            spdlog::debug("Before computing priority");
             pthread_mutex_lock(&agent_mutexes.at(lock_index));
             // TODO: add segment tree GPU
             auto priority = this->agent->compute_priority(storage.at("obs").to(device),
@@ -188,6 +194,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
                                                           storage.at("rew").to(device),
                                                           storage.at("done").to(device)).cpu();
             pthread_mutex_unlock(&agent_mutexes.at(lock_index));
+            spdlog::debug("After computing priority");
             storage["priority"] = priority;
             spdlog::debug("Size of the buffer {}", this->buffer->size());
             // store data to the replay buffer
@@ -201,14 +208,17 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
 
         episode_rewards += s.reward;
         episode_length += 1;
+        spdlog::debug("Before done");
         // handle terminal case
         if (s.done) {
+            spdlog::debug("Before store");
             logger->store({
                                   {"EpRet", std::vector<float>{episode_rewards}},
                                   {"EpLen", std::vector<float>{(float) episode_length}}
                           });
-
+            spdlog::debug("After done");
             curr_env->reset(&s);
+            spdlog::debug("After reset");
             episode_rewards = 0.;
             episode_length = 0;
         }
@@ -435,9 +445,13 @@ void rlu::trainer::OffPolicyTrainerParallel::log(int64_t global_steps_temp, int6
         logger->log_tabular("EpLen", std::nullopt, false, true);
         logger->log_tabular("TotalEnvInteracts", (float) global_steps_temp);
         logger->log_tabular("GradientSteps", (float) num_updates_temp);
+        
+        spdlog::debug("After standard logging");
 
         // add this line if the learning is implemented.
         agent->log_tabular();
+
+        spdlog::debug("After agent logging");
 
         // create a new agent. Copy the weights from the current learner
         if (online_test) {
@@ -462,6 +476,8 @@ void rlu::trainer::OffPolicyTrainerParallel::log(int64_t global_steps_temp, int6
 
         logger->log_tabular("Time", (float) watcher.seconds());
         logger->dump_tabular();
+
+        spdlog::debug("After dump tabular");
     }
 }
 
