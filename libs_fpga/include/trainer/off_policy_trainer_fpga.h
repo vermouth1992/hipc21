@@ -179,13 +179,13 @@ namespace rlu::trainer {
                 
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::in1_buf,rlu::fpga::in2_buf,rlu::fpga::in3_buf,rlu::fpga::in4_buf,rlu::fpga::in5_buf}, 0);
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::insind_buf,rlu::fpga::inpn_buf}, 0 /* 0 means from host*/);
-                spdlog::debug("Learner data Transferred to device");
-                rlu::fpga::q.finish();
+                // spdlog::debug("Learner data Transferred to device");
+                // rlu::fpga::q.finish();
                 // printf("sent data\n");
                 rlu::fpga::q.enqueueTask(krnl_top);
                 rlu::fpga::q.enqueueTask(krnl_tree);
-                spdlog::debug("Learner enqued");
-                rlu::fpga::q.finish();
+                // spdlog::debug("Learner enqued");
+                // rlu::fpga::q.finish();
                 // printf("enqueue\n");
                 rlu::fpga::q.enqueueMigrateMemObjects({rlu::fpga::out1_buf,rlu::fpga::out2_buf,rlu::fpga::out3_buf,rlu::fpga::out4_buf,rlu::fpga::out5_buf,rlu::fpga::out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
                 // printf("executed learner kernel with weight init\n");
@@ -199,7 +199,7 @@ namespace rlu::trainer {
                 // increase the number of gradient steps ?????????????????????=====================
 
                 // copy the weights from FPGA to the CPU
-                // synchronize_weights();
+                synchronize_weights();
                 this->get_update_steps(true);
                 this->wake_up_actor();
             }
@@ -223,7 +223,7 @@ namespace rlu::trainer {
             cl::Program::Binaries bins{{fileBuf, fileBufSize}};
             // using global variables (injecting global program and queue once)
             rlu::fpga::program = cl::Program(context, devices, bins, NULL, &rlu::fpga::err);
-            rlu::fpga::q = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &rlu::fpga::err);
+            rlu::fpga::q = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE| CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &rlu::fpga::err);
 
             // IO size learners
             rlu::fpga::In_rows.resize(L1*BATCHS);
@@ -451,7 +451,7 @@ namespace rlu::trainer {
             // W1
             for(int i = 0; i < L1; i++) {
                 for(int j = 0; j < L2; j++) {
-                    printf("%.8f ",rlu::fpga::Out_w1bram[i].a[j]);  //L1 rows, L2 cols     
+                    // printf("%.8f ",rlu::fpga::Out_w1bram[i].a[j]);  //L1 rows, L2 cols     
                     actor->parameters()[0].index_put_({j,i},rlu::fpga::Out_w1bram[i].a[j]);         
                 }
                 printf("\n");        
@@ -459,7 +459,7 @@ namespace rlu::trainer {
             // W2
             for(int i = 0; i < L2; i++) {
                 for(int j = 0; j < L3; j++) {
-                    printf("%.8f ",rlu::fpga::Out_w2bram[i].a[j]);  //L1 rows, L2 cols     
+                    // printf("%.8f ",rlu::fpga::Out_w2bram[i].a[j]);  //L1 rows, L2 cols     
                     // actor->parameters()[2][j][i]=rlu::fpga::Out_w1bram[i].a[j];     
                     actor->parameters()[2].index_put_({j,i},rlu::fpga::Out_w2bram[i].a[j]);    
                 }
@@ -467,14 +467,14 @@ namespace rlu::trainer {
             }
             // bias1
             for(int i = 0; i < L2; i++) {
-                printf("%.8f ",rlu::fpga::Out_bias1[i]);  //L1 rows, L2 cols     
+                // printf("%.8f ",rlu::fpga::Out_bias1[i]);  //L1 rows, L2 cols     
                 // actor->parameters()[1][i]=rlu::fpga::Out_bias1[i];  
                 actor->parameters()[1].index_put_({i},rlu::fpga::Out_bias1[i]); 
                 printf("\n");        
             }
             // bias2
             for(int i = 0; i < L3; i++) {
-                printf("%.8f ",rlu::fpga::Out_bias2[i]);  //L1 rows, L2 cols     
+                // printf("%.8f ",rlu::fpga::Out_bias2[i]);  //L1 rows, L2 cols     
                 // actor->parameters()[3][i]=rlu::fpga::Out_bias2[i];  
                 actor->parameters()[3].index_put_({i},rlu::fpga::Out_bias2[i]);        
                 printf("\n");        
