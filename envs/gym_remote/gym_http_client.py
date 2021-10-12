@@ -6,7 +6,7 @@ import requests
 import six.moves.urllib.parse as urlparse
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 
 class Client(object):
