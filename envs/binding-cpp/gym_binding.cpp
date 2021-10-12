@@ -109,7 +109,7 @@ namespace Gym {
 
         void create_server() {
             server_proc = std::make_shared<subprocess::Popen>(
-                    fmt::format("python ../envs/gym_http_server.py -p {}", port));
+                    fmt::format("python -m gym_remote.gym_http_server -p {}", port));
             // wait some time for the server to run
             sleep(2);
         }
