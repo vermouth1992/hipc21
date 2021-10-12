@@ -26,6 +26,12 @@ If your Pytorch is installed with GPU support, you also need to install the foll
 conda install cudnn cudatoolkit-dev==${CUDA_VERSION} -c conda-forge
 ```
 
+- gym-remote
+```bash
+cd envs
+pip install -e . 
+```
+
 Make sure the CUDA_VERSION matches the one you installed your Pytorch
 
 ## Build
