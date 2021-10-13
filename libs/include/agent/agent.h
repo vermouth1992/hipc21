@@ -8,6 +8,7 @@
 #include "dqn.h"
 #include "sac.h"
 #include "td3.h"
+#include "ddpg.h"
 #include "off_policy_agent.h"
 
 #endif //HIPC21_AGENT_H

@@ -28,7 +28,7 @@ set(LIBSOURCE
         src/segment_tree_nary.cpp
         src/segment_tree_cppopt.cpp
         src/uniform_replay_buffer.cpp
-        )
+        src/ddpg.cpp)
 
 add_library(rlu SHARED ${LIBSOURCE})
 target_link_libraries(rlu "${TORCH_LIBRARIES}" fmt::fmt)

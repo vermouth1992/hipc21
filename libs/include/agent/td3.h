@@ -21,6 +21,7 @@ namespace rlu::agent {
                           int64_t policy_mlp_hidden = 64,
                           float policy_lr = 1e-3,
                           int64_t q_mlp_hidden = 64,
+                          int64_t num_q_ensembles = 2,
                           float q_lr = 1e-3,
                           float tau = 5e-3,
                           float gamma = 0.99,

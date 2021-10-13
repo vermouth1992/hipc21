@@ -71,6 +71,9 @@ create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
                                                        *env->action_space());
     } else if (algorithm == "sac") {
 
+    } else if (algorithm == "ddpg") {
+        agent = std::make_shared<rlu::agent::DDPGAgent>(*env->observation_space(),
+                                                        *env->action_space());
     } else {
         throw std::runtime_error(fmt::format("Unknown algorithm {}", algorithm));
     }

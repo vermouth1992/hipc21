@@ -6,9 +6,13 @@
 
 namespace rlu::agent {
 
-    TD3Agent::TD3Agent(const Gym::Space &obs_space, const Gym::Space &act_space, int64_t policy_mlp_hidden,
+    TD3Agent::TD3Agent(const Gym::Space &obs_space,
+                       const Gym::Space &act_space,
+                       int64_t policy_mlp_hidden,
                        float policy_lr,
-                       int64_t q_mlp_hidden, float q_lr, float tau, float gamma, float actor_noise, float target_noise,
+                       int64_t q_mlp_hidden,
+                       int64_t num_q_ensembles,
+                       float q_lr, float tau, float gamma, float actor_noise, float target_noise,
                        float noise_clip) : OffPolicyAgent(tau, q_lr, gamma),
                                            actor_noise(actor_noise),
                                            target_noise(target_noise),
@@ -21,10 +25,12 @@ namespace rlu::agent {
             int64_t act_dim = act_space.box_shape[0];
             this->q_network = register_module("q_network",
                                               std::make_shared<rlu::nn::EnsembleMinQNet>(obs_dim, act_dim,
-                                                                                         q_mlp_hidden));
+                                                                                         q_mlp_hidden,
+                                                                                         num_q_ensembles));
             this->target_q_network = register_module("target_q_network",
                                                      std::make_shared<rlu::nn::EnsembleMinQNet>(obs_dim, act_dim,
-                                                                                                q_mlp_hidden));
+                                                                                                q_mlp_hidden,
+                                                                                                num_q_ensembles));
             this->q_optimizer = std::make_unique<torch::optim::Adam>(q_network.ptr()->parameters(),
                                                                      torch::optim::AdamOptions(q_lr));
             this->policy_net = register_module("policy_network", rlu::nn::build_mlp(obs_dim, act_dim,
