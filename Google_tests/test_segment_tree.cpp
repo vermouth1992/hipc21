@@ -1,20 +1,52 @@
-////
-//// Created by chi on 7/4/21.
-////
 //
-//#include "gtest/gtest.h"
-//#include "replay_buffer/segment_tree.h"
-//#include "utils/rl_functional.h"
-//#include "utils/stop_watcher.h"
+// Created by chi on 7/4/21.
 //
-//TEST(SegmentTree, speed) {
-//    StopWatcher origin;
-//    StopWatcher optimized;
-//    int64_t batch_size = 100;
-//    int64_t iterations = 10000;
-//    std::vector<int64_t> tree_sizes{1000, 10000, 100000};
-//    std::vector<int64_t> K{1024, 2048, 4096};
-//
+
+#include "gtest/gtest.h"
+#include "replay_buffer/segment_tree.h"
+#include "utils/rl_functional.h"
+#include "utils/stop_watcher.h"
+#include "fmt/core.h"
+#include "fmt/ostream.h"
+
+TEST(SegmentTree, speed) {
+    rlu::watcher::StopWatcher watcher;
+
+    std::vector<int64_t> batch_size_lst = {8, 16, 32, 64, 128, 256};
+    int64_t K = 32;
+    int64_t tree_size = 10000;
+    int64_t iterations = 10000;
+
+    rlu::replay_buffer::SegmentTreeNary tree(tree_size, K);
+
+    // update/insertion
+    for (auto &batch_size: batch_size_lst) {
+        watcher.reset();
+        watcher.start();
+        for (int i = 0; i < iterations; i++) {
+            auto idx = torch::randint(tree_size, {batch_size}, torch::TensorOptions().dtype(torch::kInt64));
+            auto value = torch::rand({batch_size}) * 10;
+            tree.set(idx, value);
+        }
+        watcher.lap();
+        fmt::print("Insertion elapsed for batch size {}: {}\n", batch_size,
+                   watcher.milliseconds() / (double) iterations);
+    }
+
+    // sampling
+    for (auto &batch_size: batch_size_lst) {
+        watcher.reset();
+        watcher.start();
+        for (int i = 0; i < iterations; i++) {
+            volatile auto result = tree.sample_idx(batch_size);
+        }
+        watcher.lap();
+        fmt::print("Sampling elapsed for batch size {}: {}\n", batch_size,
+                   watcher.milliseconds() / (double) iterations);
+    }
+
+
+
 //
 //    for (int64_t tree_size : tree_sizes) {
 //        for (int64_t k : K) {
@@ -50,8 +82,8 @@
 //        }
 //
 //    }
-//}
-//
+}
+
 //TEST(SegmentTree, reduce) {
 //    int64_t tree_size = 20;
 //    int64_t index_size = 3;
