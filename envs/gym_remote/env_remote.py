@@ -11,8 +11,8 @@ import gym
 import numpy as np
 import torch
 
-from gym_remote.gym_http_client import Client
-from gym_remote.gym_http_server import encode_tensor_base64, decode_tensor
+from .gym_http_client import Client
+from .gym_http_server import encode_tensor_base64, decode_tensor
 
 _PORT = 5000
 

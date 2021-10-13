@@ -18,10 +18,10 @@ namespace rlu::agent {
     public:
         explicit TD3Agent(const Gym::Space &obs_space,
                           const Gym::Space &act_space,
-                          int64_t policy_mlp_hidden = 128,
-                          float policy_lr = 3e-4,
-                          int64_t q_mlp_hidden = 256,
-                          float q_lr = 3e-4,
+                          int64_t policy_mlp_hidden = 64,
+                          float policy_lr = 1e-3,
+                          int64_t q_mlp_hidden = 64,
+                          float q_lr = 1e-3,
                           float tau = 5e-3,
                           float gamma = 0.99,
                           float actor_noise = 0.1,
@@ -41,24 +41,16 @@ namespace rlu::agent {
 
         torch::Tensor
         compute_priority(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                         const torch::Tensor &rew, const torch::Tensor &done) override {
-            return {};
-        }
+                         const torch::Tensor &rew, const torch::Tensor &done) override;
 
-        void set_grad(const str_to_tensor_list &grads) override {
-
-        }
+        void set_grad(const str_to_tensor_list &grads) override;
 
         std::pair<str_to_tensor_list, str_to_tensor>
         compute_grad(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
                      const torch::Tensor &rew, const torch::Tensor &done,
-                     const std::optional<torch::Tensor> &importance_weights, bool update_target) override {
-            return {};
-        }
+                     const std::optional<torch::Tensor> &importance_weights, bool update_target) override;
 
-        void update_step(bool update_target) override {
-
-        }
+        void update_step(bool update_target) override;
 
     private:
         const float actor_noise;
@@ -73,9 +65,9 @@ namespace rlu::agent {
                                        const torch::Tensor &rew,
                                        const torch::Tensor &done);
 
-        void update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                          const torch::Tensor &rew, const torch::Tensor &done,
-                          const std::optional<torch::Tensor> &importance_weights);
+        str_to_tensor update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                                   const torch::Tensor &rew, const torch::Tensor &done,
+                                   const std::optional<torch::Tensor> &importance_weights);
 
         void update_actor(const torch::Tensor &obs);
 

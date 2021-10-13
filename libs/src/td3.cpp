@@ -69,13 +69,13 @@ namespace rlu::agent {
     TD3Agent::train_step(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
                          const torch::Tensor &rew, const torch::Tensor &done,
                          const std::optional<torch::Tensor> &importance_weights, bool update_target) {
-        this->update_q_net(obs, act, next_obs, rew, done, importance_weights);
+        auto info = this->update_q_net(obs, act, next_obs, rew, done, importance_weights);
         if (update_target) {
             this->update_actor(obs);
             this->update_target_q(true);
             this->update_target_policy(true);
         }
-        return {};
+        return info;
     }
 
     torch::Tensor TD3Agent::act_single(const torch::Tensor &obs, bool exploration) {
@@ -105,9 +105,10 @@ namespace rlu::agent {
         return rew + gamma * (1. - done) * next_q_value;
     }
 
-    void TD3Agent::update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
-                                const torch::Tensor &rew, const torch::Tensor &done,
-                                const std::optional<torch::Tensor> &importance_weights) {
+    str_to_tensor
+    TD3Agent::update_q_net(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                           const torch::Tensor &rew, const torch::Tensor &done,
+                           const std::optional<torch::Tensor> &importance_weights) {
         auto q_target = this->compute_target_q(next_obs, rew, done);
         q_optimizer->zero_grad();
         auto q_values = this->q_network.forward(obs, act, false); // (num_ensemble, None)
@@ -125,6 +126,10 @@ namespace rlu::agent {
                             rlu::nn::convert_tensor_to_flat_vector<float>(q_values.index({0}).detach()));
         }
         m_logger->store("LossQ", q_values_loss.item<float>());
+
+        auto priority = torch::abs(std::get<0>(torch::min(q_values, 0)) - q_target).detach().cpu();
+        str_to_tensor info{{"priority", priority}};
+        return info;
     }
 
     void TD3Agent::update_actor(const torch::Tensor &obs) {
@@ -135,5 +140,78 @@ namespace rlu::agent {
         policy_loss.backward();
         policy_optimizer->step();
         m_logger->store("LossPi", policy_loss.item<float>());
+    }
+
+    torch::Tensor
+    TD3Agent::compute_priority(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                               const torch::Tensor &rew, const torch::Tensor &done) {
+        torch::NoGradGuard no_grad;
+        auto target_q_values = this->compute_target_q(next_obs, rew, done);
+        auto q_values = this->q_network.forward(obs, act, true);
+        return torch::abs(q_values - target_q_values);
+    }
+
+    void TD3Agent::set_grad(const str_to_tensor_list &grads) {
+        auto q_grad = grads.at("q_grads");
+        for (size_t i = 0; i < q_grad.size(); i++) {
+            this->q_network.ptr()->parameters().at(i).mutable_grad() = q_grad.at(i);
+        }
+        if (grads.contains("p_grads")) {
+            auto p_grad = grads.at("p_grads");
+            for (size_t i = 0; i < p_grad.size(); i++) {
+                this->policy_net.ptr()->parameters().at(i).mutable_grad() = p_grad.at(i);
+            }
+        }
+    }
+
+    std::pair<str_to_tensor_list, str_to_tensor>
+    TD3Agent::compute_grad(const torch::Tensor &obs, const torch::Tensor &act, const torch::Tensor &next_obs,
+                           const torch::Tensor &rew, const torch::Tensor &done,
+                           const std::optional<torch::Tensor> &importance_weights, bool update_target) {
+        // compute q loss
+        auto target_q_values = this->compute_target_q(next_obs, rew, done);
+        q_optimizer->zero_grad();
+        auto q_values = this->q_network.forward(obs, act, false); // (num_ensemble, None)
+        auto q_values_loss = 0.5 * torch::square(torch::unsqueeze(target_q_values, 0) - q_values);
+        q_values_loss = torch::sum(q_values_loss, 0);  // (None,)
+        // apply importance weights
+        if (importance_weights != std::nullopt) {
+            q_values_loss = q_values_loss * importance_weights.value();
+        }
+        q_values_loss = torch::mean(q_values_loss);
+        auto grads = torch::autograd::grad({q_values_loss}, this->q_network.ptr()->parameters());
+
+        str_to_tensor_list output{
+                {"q_grads", grads}
+        };
+        auto priority = torch::abs(std::get<0>(torch::min(q_values, 0)) - target_q_values).detach().cpu();
+        str_to_tensor info{{"priority", priority}};
+
+        for (int i = 0; i < 2; i++) {
+            m_logger->store(fmt::format("Q{}Vals", i + 1),
+                            rlu::nn::convert_tensor_to_flat_vector<float>(q_values.index({0}).detach()));
+        }
+        m_logger->store("LossQ", q_values_loss.item<float>());
+
+        // compute actor loss
+        if (update_target) {
+            auto current_act = this->policy_net.forward(obs);
+            auto q = this->q_network.forward(obs, current_act, true);
+            auto policy_loss = -torch::mean(q);
+            auto policy_grads = torch::autograd::grad({policy_loss}, this->policy_net.ptr()->parameters());
+            output["p_grads"] = policy_grads;
+            m_logger->store("LossPi", policy_loss.item<float>());
+        }
+
+        return std::make_pair(output, info);
+    }
+
+    void TD3Agent::update_step(bool update_target) {
+        q_optimizer->step();
+        if (update_target) {
+            policy_optimizer->step();
+            this->update_target_q(true);
+            this->update_target_policy(true);
+        }
     }
 }

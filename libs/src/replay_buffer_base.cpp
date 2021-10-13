@@ -85,7 +85,7 @@ namespace rlu::replay_buffer {
     void ReplayBuffer::add_single(str_to_tensor &data) {
         // add batch dimension
         for (auto &it: data) {
-            it.second.unsqueeze_(0);
+            it.second = it.second.unsqueeze(0);
         }
         this->add_batch(data);
     }

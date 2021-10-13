@@ -76,6 +76,8 @@ namespace rlu::trainer {
         watcher.start();
         env->reset(&s);
 
+        spdlog::debug("obs shape: {}", s.observation.sizes());
+
         this->reset();
 
         spdlog::info("Start training");
@@ -129,6 +131,9 @@ namespace rlu::trainer {
         torch::Tensor action;
         // copy observation
         auto current_obs = s.observation;
+
+        spdlog::debug("Current obs shape: {}", current_obs.sizes());
+
         if (total_steps < start_steps) {
             action = env->action_space()->sample();
         } else {
