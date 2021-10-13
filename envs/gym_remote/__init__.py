@@ -16,3 +16,17 @@ for env in all_envs:
     register(
         **attributes
     )
+
+register(
+    id='CartPoleContinuous-v0',
+    entry_point='gym_remote.cartpole_continuous:CartPoleEnv',
+    max_episode_steps=200,
+    reward_threshold=195.0,
+)
+
+register(
+    id='CartPoleContinuous-v1',
+    entry_point='gym_remote.cartpole_continuous:CartPoleEnv',
+    max_episode_steps=500,
+    reward_threshold=475.0,
+)
