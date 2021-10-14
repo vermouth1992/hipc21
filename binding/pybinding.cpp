@@ -14,7 +14,9 @@ void declare_array(py::module &m, const std::string &typestr) {
     py::class_<Class>(m, pyclass_name.c_str())
             .def(py::init<int64_t, int64_t>())
             .def("size", &Class::size)
-            .def("set", &Class::set);
+            .def("set", &Class::set)
+            .def("get_prefix_sum_idx", &Class::get_prefix_sum_idx)
+            .def("reduce", py::overload_cast<>(&Class::reduce, py::const_));
 }
 
 // Python binding
