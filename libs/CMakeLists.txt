@@ -13,7 +13,6 @@ set(LIBSOURCE
         src/value_net.cpp
         src/replay_buffer_base.cpp
         src/segment_tree_base.cpp
-        src/SumTree.cpp
         src/dqn.cpp
         src/sac.cpp
         src/dqn.cpp

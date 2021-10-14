@@ -1,2 +1,2 @@
 pybind11_add_module(sumtree pybinding.cpp)
-target_link_libraries(sumtree PRIVATE rlu)
+target_link_libraries(sumtree PRIVATE fmt::fmt)
