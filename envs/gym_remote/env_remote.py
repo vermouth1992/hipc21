@@ -51,8 +51,8 @@ class RemoteEnv(gym.Env):
         server_file = os.path.join(current_dir, "gym_http_server.py")
         command = "python {} -p {}".format(server_file, port)
 
-        self.server_process = subprocess.Popen(command.split(), shell=False,
-                                               stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        self.server_process = subprocess.Popen(command.split(), shell=False, )
+        # stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         time.sleep(1.5)
         self.instance_id = self.client.env_create(env_id)
 
