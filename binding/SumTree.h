@@ -5,6 +5,8 @@
 #ifndef HIPC21_SUMTREE_H
 #define HIPC21_SUMTREE_H
 
+#define FMT_HEADER_ONLY
+
 #include <cstdint>
 #include <cmath>
 #include <iostream>
