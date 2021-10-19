@@ -17,5 +17,6 @@ add_executable(run_test
         test_cpu.cpp test_print.cpp
         test_env.cpp
         test_pthread.cpp
-        benchmark/parallel_torch.cpp)
-target_link_libraries(run_test gtest gtest_main "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} gym_cpp rlu)
+        benchmark/parallel_torch.cpp
+        test_py_array.cpp)
+target_link_libraries(run_test gtest gtest_main "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} gym_cpp rlu pybind11::embed)
