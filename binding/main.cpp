@@ -6,6 +6,7 @@
 #include <pybind11/numpy.h>
 #include <iostream>
 #include <torch/torch.h>
+#include "spaces.h"
 
 namespace py = pybind11;
 
