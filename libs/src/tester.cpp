@@ -4,7 +4,7 @@
 
 #include "trainer/tester.h"
 
-rlu::trainer::Tester::Tester(std::shared_ptr<Gym::Environment> env, std::shared_ptr<agent::OffPolicyAgent> test_actor,
+rlu::trainer::Tester::Tester(std::shared_ptr<gym::env::Env> env, std::shared_ptr<agent::OffPolicyAgent> test_actor,
                              std::shared_ptr<rlu::logger::EpochLogger> logger, int64_t num_test_episodes,
                              const torch::Device &device) :
         m_logger(std::move(logger)),
@@ -29,14 +29,14 @@ void rlu::trainer::Tester::run() {
 }
 
 void rlu::trainer::Tester::test_step() {
-    Gym::State test_s;
+    gym::env::State test_s;
     // testing variables
-    m_test_env->reset(&test_s);
+    m_test_env->reset(test_s);
     float test_episode_reward = 0;
     float test_episode_length = 0;
     while (true) {
         auto tensor_action = m_test_actor->act_single(test_s.observation.to(m_device), false).to(torch::kCPU);
-        m_test_env->step(tensor_action, false, &test_s);
+        m_test_env->step(tensor_action, test_s);
         test_episode_reward += test_s.reward;
         test_episode_length += 1;
         if (test_s.done) break;
@@ -45,7 +45,7 @@ void rlu::trainer::Tester::test_step() {
     m_logger->store("TestEpLen", test_episode_length);
 }
 
-void rlu::trainer::Tester::set_env(const std::shared_ptr<Gym::Environment> &env) {
+void rlu::trainer::Tester::set_env(const std::shared_ptr<gym::env::Env> &env) {
     this->m_test_env = env;
 }
 

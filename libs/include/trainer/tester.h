@@ -8,19 +8,19 @@
 #include <agent/off_policy_agent.h>
 
 #include <utility>
-#include "gym/gym.h"
+#include "gym_cpp/envs/env.h"
 #include "logger.h"
 
 namespace rlu::trainer {
     class Tester {
     public:
-        explicit Tester(std::shared_ptr<Gym::Environment> env,
+        explicit Tester(std::shared_ptr<gym::env::Env> env,
                         std::shared_ptr<agent::OffPolicyAgent> test_actor,
                         std::shared_ptr<rlu::logger::EpochLogger> logger,
                         int64_t num_test_episodes,
                         const torch::Device &device);
 
-        void set_env(const std::shared_ptr<Gym::Environment> &env);
+        void set_env(const std::shared_ptr<gym::env::Env> &env);
 
         void set_actor(const std::shared_ptr<agent::OffPolicyAgent> &actor);
 
@@ -37,7 +37,7 @@ namespace rlu::trainer {
     private:
         std::shared_ptr<rlu::logger::EpochLogger> m_logger;
         int64_t m_num_test_episodes;
-        std::shared_ptr<Gym::Environment> m_test_env;
+        std::shared_ptr<gym::env::Env> m_test_env;
         std::shared_ptr<agent::OffPolicyAgent> m_test_actor;
         torch::Device m_device;
     };

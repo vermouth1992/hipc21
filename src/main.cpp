@@ -7,6 +7,7 @@
 #include "trainer/trainer.h"
 #include "cxxopts.hpp"
 #include "spdlog/spdlog.h"
+#include "gym_cpp/gym.h"
 
 #ifdef USE_FPGA
 #include "trainer/off_policy_trainer_fpga.h"
@@ -59,21 +60,21 @@ static cxxopts::ParseResult parse(int argc, char *argv[]) {
 }
 
 std::shared_ptr<rlu::agent::OffPolicyAgent>
-create_agent(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+create_agent(const std::function<std::shared_ptr<gym::env::Env>()> &env_fn,
              const std::string &algorithm) {
     auto env = env_fn();
     std::shared_ptr<rlu::agent::OffPolicyAgent> agent;
     if (algorithm == "dqn") {
-        agent = std::make_shared<rlu::agent::DQN>(*env->observation_space(),
-                                                  *env->action_space());
+        agent = std::make_shared<rlu::agent::DQN>(env->observation_space,
+                                                  env->action_space);
     } else if (algorithm == "td3") {
-        agent = std::make_shared<rlu::agent::TD3Agent>(*env->observation_space(),
-                                                       *env->action_space());
+        agent = std::make_shared<rlu::agent::TD3Agent>(env->observation_space,
+                                                       env->action_space);
     } else if (algorithm == "sac") {
 
     } else if (algorithm == "ddpg") {
-        agent = std::make_shared<rlu::agent::DDPGAgent>(*env->observation_space(),
-                                                        *env->action_space());
+        agent = std::make_shared<rlu::agent::DDPGAgent>(env->observation_space,
+                                                        env->action_space);
     } else {
         throw std::runtime_error(fmt::format("Unknown algorithm {}", algorithm));
     }
@@ -97,14 +98,9 @@ int main(int argc, char **argv) {
         int64_t num_actors = result["num_actors"].as<int64_t>();
         int64_t num_learners = result["num_learners"].as<int64_t>();
 
-        int port = 5000;
-
         // get environment function
-        std::function<std::shared_ptr<Gym::Environment>()> env_fn = [&port, &env_id]() {
-            spdlog::info("Creating environment with port {}", port);
-            std::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", port);
-            port += 1;
-            return client->make(env_id);
+        std::function<std::shared_ptr<gym::env::Env>()> env_fn = [&env_id]() {
+            return gym::make(env_id);
         };
 
         // get agent function

@@ -30,4 +30,4 @@ set(LIBSOURCE
         src/ddpg.cpp)
 
 add_library(rlu SHARED ${LIBSOURCE})
-target_link_libraries(rlu "${TORCH_LIBRARIES}" fmt::fmt)
+target_link_libraries(rlu "${TORCH_LIBRARIES}" fmt::fmt gym_cpp)

@@ -5,7 +5,7 @@ project(Google_tests)
 
 # 'lib' is the folder with Google Test sources
 add_subdirectory(lib)
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} "${TORCH_INCLUDE_DIRS}" "../envs/binding-cpp/include")
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} "${TORCH_INCLUDE_DIRS}" "../libs/include")
 
 find_package(fmt)
 # 'Google_Tests_run' is the target name
@@ -15,7 +15,6 @@ add_executable(run_test
         test_libtorch.cpp
         test_cache_performance.cpp
         test_cpu.cpp test_print.cpp
-        test_env.cpp
         test_pthread.cpp
         benchmark/parallel_torch.cpp
         test_py_array.cpp)

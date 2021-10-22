@@ -14,14 +14,14 @@
 #include "replay_buffer/segment_tree.h"
 #include "tester.h"
 #include "logger.h"
-#include "gym/gym.h"
+#include "gym_cpp/envs/env.h"
 #include "utils/stop_watcher.h"
 
 namespace rlu::trainer {
 
     class OffPolicyTrainer {
     public:
-        explicit OffPolicyTrainer(std::function<std::shared_ptr<Gym::Environment>()> env_fn,
+        explicit OffPolicyTrainer(std::function<std::shared_ptr<gym::env::Env>()> env_fn,
                                   const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                   int64_t epochs,
                                   int64_t steps_per_epoch,
@@ -46,13 +46,13 @@ namespace rlu::trainer {
         virtual void train();
 
     protected:
-        const std::function<std::shared_ptr<Gym::Environment>()> env_fn;
+        const std::function<std::shared_ptr<gym::env::Env>()> env_fn;
         const std::function<std::shared_ptr<agent::OffPolicyAgent>()> agent_fn;
         std::shared_ptr<rlu::replay_buffer::ReplayBuffer> buffer;
         // a replay buffer holding temporary data.
         std::vector<std::shared_ptr<rlu::replay_buffer::ReplayBuffer>> temp_buffer;
-        std::shared_ptr<Gym::Environment> env;
-        std::shared_ptr<Gym::Environment> test_env;
+        std::shared_ptr<gym::env::Env> env;
+        std::shared_ptr<gym::env::Env> test_env;
         std::shared_ptr<rlu::logger::EpochLogger> logger;
         std::shared_ptr<rlu::trainer::Tester> tester;
         const std::shared_ptr<agent::OffPolicyAgent> agent;
@@ -73,12 +73,10 @@ namespace rlu::trainer {
         float episode_rewards{};
         float episode_length{};
         int64_t num_updates{};
-        Gym::State s;
+        gym::env::State s;
         rlu::watcher::StopWatcher watcher;
 
         void set_default_exp_name(std::optional<std::string> &exp_name);
-
-        void test_step(const std::shared_ptr<agent::OffPolicyAgent> &test_actor);
 
     private:
         void train_step();

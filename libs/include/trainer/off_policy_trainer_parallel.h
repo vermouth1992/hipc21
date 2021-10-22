@@ -14,7 +14,7 @@ namespace rlu::trainer {
 
     class OffPolicyTrainerParallel : public OffPolicyTrainer {
     public:
-        explicit OffPolicyTrainerParallel(const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+        explicit OffPolicyTrainerParallel(const std::function<std::shared_ptr<gym::env::Env>()> &env_fn,
                                           const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                           int64_t epochs,
                                           int64_t steps_per_epoch,
@@ -88,7 +88,7 @@ namespace rlu::trainer {
         std::vector<pthread_t> learner_threads;
         pthread_t tester_thread{};
         // environments
-        std::vector<std::shared_ptr<Gym::Environment>> envs;
+        std::vector<std::shared_ptr<gym::env::Env>> envs;
         // mutexes
         pthread_mutex_t global_steps_mutex{};
         pthread_mutex_t update_steps_mutex{};

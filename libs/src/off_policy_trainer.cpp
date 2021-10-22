@@ -10,7 +10,7 @@
 
 namespace rlu::trainer {
 
-    OffPolicyTrainer::OffPolicyTrainer(std::function<std::shared_ptr<Gym::Environment>()> env_fn,
+    OffPolicyTrainer::OffPolicyTrainer(std::function<std::shared_ptr<gym::env::Env>()> env_fn,
                                        const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn,
                                        int64_t epochs, int64_t steps_per_epoch,
                                        int64_t start_steps, int64_t update_after, int64_t update_every,
@@ -46,18 +46,21 @@ namespace rlu::trainer {
     void OffPolicyTrainer::setup_replay_buffer(int64_t replay_size, int64_t batch_size) {
         spdlog::info("Setting up the replay buffer");
         std::unique_ptr<DataSpec> action_data_spec;
-        auto action_space = test_env->action_space();
-        auto observation_space = test_env->observation_space();
-        if (action_space->type == action_space->DISCRETE) {
+        auto action_space = test_env->action_space;
+        auto observation_space = test_env->observation_space;
+        if (action_space->get_type() == gym::space::Type::Discrete_t) {
             action_data_spec = std::make_unique<DataSpec>(std::vector<int64_t>(), torch::kInt64);
-        } else {
-            action_data_spec = std::make_unique<DataSpec>(action_space->box_shape, torch::kFloat32);
+        } else if (action_space->get_type() == gym::space::Type::Box_t) {
+            auto box_action_space = std::dynamic_pointer_cast<gym::space::Box>(action_space);
+            action_data_spec = std::make_unique<DataSpec>(box_action_space->get_shape().vec(), torch::kFloat32);
         }
+
+        auto box_observation_space = std::dynamic_pointer_cast<gym::space::Box>(observation_space);
         // setup replay buffer
         str_to_dataspec data_spec{
-                {"obs",      DataSpec(observation_space->box_shape, torch::kFloat32)},
+                {"obs",      DataSpec(box_observation_space->get_shape().vec(), torch::kFloat32)},
                 {"act",      *action_data_spec},
-                {"next_obs", DataSpec(observation_space->box_shape, torch::kFloat32)},
+                {"next_obs", DataSpec(box_observation_space->get_shape().vec(), torch::kFloat32)},
                 {"rew",      DataSpec({}, torch::kFloat32)},
                 {"done",     DataSpec({}, torch::kFloat32)},
         };
@@ -74,9 +77,7 @@ namespace rlu::trainer {
         // setup agent
         agent->to(device);
         watcher.start();
-        env->reset(&s);
-
-        spdlog::debug("obs shape: {}", s.observation.sizes());
+        env->reset(s);
 
         this->reset();
 
@@ -109,23 +110,6 @@ namespace rlu::trainer {
         }
     }
 
-    void OffPolicyTrainer::test_step(const std::shared_ptr<agent::OffPolicyAgent> &test_actor) {
-        Gym::State test_s;
-        // testing variables
-        test_env->reset(&test_s);
-        float test_episode_reward = 0;
-        float test_episode_length = 0;
-        while (true) {
-            auto tensor_action = test_actor->act_single(test_s.observation.to(device), false).to(cpu);
-            test_env->step(tensor_action, false, &test_s);
-            test_episode_reward += test_s.reward;
-            test_episode_length += 1;
-            if (test_s.done) break;
-        }
-        logger->store("TestEpRet", test_episode_reward);
-        logger->store("TestEpLen", test_episode_length);
-    }
-
     void OffPolicyTrainer::train_step() {
         // compute action
         torch::Tensor action;
@@ -135,13 +119,13 @@ namespace rlu::trainer {
         spdlog::debug("Current obs shape: {}", current_obs.sizes());
 
         if (total_steps < start_steps) {
-            action = env->action_space()->sample();
+            action = env->action_space->sample();
         } else {
             action = agent->act_single(current_obs.to(device), true).to(cpu);
         }
 
         // environment step
-        env->step(action, false, &s);
+        env->step(action, s);
 
         // TODO: need to see if it is true done or done due to reaching the maximum length.
         // convert data type
@@ -188,7 +172,7 @@ namespace rlu::trainer {
                                   {"EpLen", std::vector<float>{(float) episode_length}}
                           });
             spdlog::debug("Finish episode");
-            env->reset(&s);
+            env->reset(s);
             episode_rewards = 0.;
             episode_length = 0;
         }
@@ -238,7 +222,7 @@ namespace rlu::trainer {
     void OffPolicyTrainer::set_default_exp_name(std::optional<std::string> &exp_name) {
         if (exp_name == std::nullopt) {
             auto &r = *agent;
-            exp_name.emplace(test_env->env_id + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
+            exp_name.emplace(test_env->get_env_name() + "_" + std::string(NAMEOF_SHORT_TYPE_RTTI(r)));
         }
     }
 

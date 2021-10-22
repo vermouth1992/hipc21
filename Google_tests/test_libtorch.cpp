@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 #include <torch/torch.h>
 #include "nlohmann/json.hpp"
-#include "base64.h"
 #include "nn/functional.h"
 #include <fstream>
 #include <fmt/format.h>
@@ -60,28 +59,28 @@ TEST(Libtorch, tensor_return) {
     std::cout << tensor.data_ptr() << " " << tensor1.data_ptr() << std::endl;
 }
 
-
-TEST(Libtorch, serialization) {
-    // read file
-    std::ifstream input("../../tensor.pt");
-    std::string str((std::istreambuf_iterator<char>(input)),
-                    std::istreambuf_iterator<char>());
-    std::string s;
-    // b64decode
-    macaron::Base64::Decode(str, s);
-    std::vector<char> f(s.length());
-    std::copy(s.begin(), s.end(), f.begin());
-    torch::Tensor x = torch::pickle_load(f).toTensor();
-    std::cout << x << std::endl;
-}
-
-TEST(Libtorch, cpp_to_python) {
-    torch::Tensor x = torch::rand({3, 4}, torch::TensorOptions().dtype(torch::kFloat32));
-    std::cout << x << std::endl;
-    std::vector<char> f = torch::pickle_save(x);
-    std::string result(f.begin(), f.end());
-//    std::string result = macaron::Base64::Encode(f);
-    std::ofstream out("../../tensor.pt");
-    out << result;
-    out.close();
-}
+//
+//TEST(Libtorch, serialization) {
+//    // read file
+//    std::ifstream input("../../tensor.pt");
+//    std::string str((std::istreambuf_iterator<char>(input)),
+//                    std::istreambuf_iterator<char>());
+//    std::string s;
+//    // b64decode
+//    macaron::Base64::Decode(str, s);
+//    std::vector<char> f(s.length());
+//    std::copy(s.begin(), s.end(), f.begin());
+//    torch::Tensor x = torch::pickle_load(f).toTensor();
+//    std::cout << x << std::endl;
+//}
+//
+//TEST(Libtorch, cpp_to_python) {
+//    torch::Tensor x = torch::rand({3, 4}, torch::TensorOptions().dtype(torch::kFloat32));
+//    std::cout << x << std::endl;
+//    std::vector<char> f = torch::pickle_save(x);
+//    std::string result(f.begin(), f.end());
+////    std::string result = macaron::Base64::Encode(f);
+//    std::ofstream out("../../tensor.pt");
+//    out << result;
+//    out.close();
+//}

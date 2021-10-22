@@ -4,7 +4,9 @@
 
 #include "agent/ddpg.h"
 
-rlu::agent::DDPGAgent::DDPGAgent(const Gym::Space &obs_space, const Gym::Space &act_space, int64_t policy_mlp_hidden,
+rlu::agent::DDPGAgent::DDPGAgent(const std::shared_ptr<gym::space::Space> &obs_space,
+                                 const std::shared_ptr<gym::space::Space> &act_space,
+                                 int64_t policy_mlp_hidden,
                                  float policy_lr, int64_t q_mlp_hidden, float q_lr, float tau, float gamma,
                                  float actor_noise) :
         TD3Agent(obs_space, act_space, policy_mlp_hidden,

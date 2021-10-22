@@ -1,33 +1,13 @@
-#
-#   Hello World client in Python
-#   Connects REQ socket to tcp://localhost:5555
-#   Sends "Hello" to server, expects "World" back
-#
-
 import gym
 import numpy as np
 import zmq
 import subprocess
 import tempfile
 import os
-import signal
 import json
-import io
-import base64
 import six
 
-
-def encode_numpy(array: np.ndarray) -> str:
-    b = io.BytesIO()
-    np.savez(b, x=array)
-    encoded = base64.b64encode(b.getvalue()).decode('ascii')
-    return encoded
-
-
-def decode_numpy(string: str) -> np.ndarray:
-    decoded = base64.b64decode(string)
-    buffer = io.BytesIO(decoded)
-    return np.load(buffer)['x']
+from .encoding import encode_numpy, decode_numpy
 
 
 def decode_space(space):
@@ -82,8 +62,8 @@ class ZeroMQEnv(gym.Env):
         raise ValueError(f"Can't find available port in {max_trial} trials")
 
     def create_server(self, port):
-        server_file = "zeromq_gym_server.py"
-        command = "python {} -p {}".format(server_file, port)
+        server_file = "gym_zmq.zeromq_gym_server"
+        command = "python -m {} -p {}".format(server_file, port)
         server_process = subprocess.Popen(command.split(), shell=False)
         return server_process
 
@@ -93,8 +73,14 @@ class ZeroMQEnv(gym.Env):
         socket.connect(f"ipc://{self.directory}/{self.port}")
         return socket
 
+    def close(self):
+        if self.server_process is not None:
+            self.server_process.terminate()
+            self.server_process.wait()
+            self.server_process = None
+
     def __del__(self):
-        os.kill(self.server_process.pid, signal.SIGTERM)
+        self.close()
 
     def _query(self, query):
         encoding = 'utf-8'

@@ -8,7 +8,6 @@
 #include "nn/functional.h"
 #include "nn/layers.h"
 #include "off_policy_agent.h"
-#include "gym/gym.h"
 #include "common.h"
 #include <cmath>
 
@@ -16,8 +15,8 @@ namespace rlu::agent {
 
     class TD3Agent : public OffPolicyAgent {
     public:
-        explicit TD3Agent(const Gym::Space &obs_space,
-                          const Gym::Space &act_space,
+        explicit TD3Agent(const std::shared_ptr<gym::space::Space> &obs_space,
+                          const std::shared_ptr<gym::space::Space> &act_space,
                           int64_t policy_mlp_hidden = 64,
                           float policy_lr = 1e-3,
                           int64_t q_mlp_hidden = 64,
@@ -54,10 +53,10 @@ namespace rlu::agent {
         void update_step(bool update_target) override;
 
     private:
-        const float actor_noise;
-        const float target_noise;
-        const float noise_clip;
-        const float act_lim;
+        float actor_noise;
+        float target_noise;
+        float noise_clip;
+        float act_lim;
         torch::nn::AnyModule policy_net;
         torch::nn::AnyModule target_policy_net;
         std::unique_ptr<torch::optim::Optimizer> policy_optimizer;

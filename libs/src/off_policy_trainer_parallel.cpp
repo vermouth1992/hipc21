@@ -6,7 +6,7 @@
 #include "fmt/ostream.h"
 
 rlu::trainer::OffPolicyTrainerParallel::OffPolicyTrainerParallel(
-        const std::function<std::shared_ptr<Gym::Environment>()> &env_fn,
+        const std::function<std::shared_ptr<gym::env::Env>()> &env_fn,
         const std::function<std::shared_ptr<agent::OffPolicyAgent>()> &agent_fn, int64_t epochs,
         int64_t steps_per_epoch, int64_t start_steps, int64_t update_after, int64_t update_every,
         int64_t update_per_step, int64_t policy_delay, int64_t num_test_episodes, torch::Device device, int64_t seed,
@@ -90,8 +90,8 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
     // get environment
     auto curr_env = envs.at(index);
 
-    Gym::State s;
-    curr_env->reset(&s);
+    gym::env::State s;
+    curr_env->reset(s);
     int64_t max_global_steps = epochs * steps_per_epoch;
     // logging
     float episode_rewards = 0;
@@ -130,7 +130,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
 
         if (global_steps_temp < start_steps) {
             spdlog::debug("Sample random actions");
-            action = curr_env->action_space()->sample();
+            action = curr_env->action_space->sample();
         } else {
             spdlog::debug("Start using agent action");
             // hold actor mutex. Should be mutually exclusive when copying the weights from learner to the actor
@@ -145,7 +145,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
 
         spdlog::debug("Before step");
         // environment step
-        curr_env->step(action, false, &s);
+        curr_env->step(action, s);
         spdlog::debug("After step");
 
         // TODO: need to see if it is true done or done due to reaching the maximum length.
@@ -217,7 +217,7 @@ void rlu::trainer::OffPolicyTrainerParallel::actor_fn_internal() {
                                   {"EpLen", std::vector<float>{(float) episode_length}}
                           });
             spdlog::debug("After done");
-            curr_env->reset(&s);
+            curr_env->reset(s);
             spdlog::debug("After reset");
             episode_rewards = 0.;
             episode_length = 0;
@@ -445,7 +445,7 @@ void rlu::trainer::OffPolicyTrainerParallel::log(int64_t global_steps_temp, int6
         logger->log_tabular("EpLen", std::nullopt, false, true);
         logger->log_tabular("TotalEnvInteracts", (float) global_steps_temp);
         logger->log_tabular("GradientSteps", (float) num_updates_temp);
-        
+
         spdlog::debug("After standard logging");
 
         // add this line if the learning is implemented.
@@ -460,10 +460,7 @@ void rlu::trainer::OffPolicyTrainerParallel::log(int64_t global_steps_temp, int6
             rlu::functional::hard_update(*test_actor, *actor);
             pthread_mutex_unlock(&test_actor_mutex);
 
-            // test the current policy
-            for (int i = 0; i < num_test_episodes; ++i) {
-                test_step(test_actor);
-            }
+            // TODO: test the current policy
         }
 
         // logging

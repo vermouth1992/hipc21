@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.15)
-project(hipc21)
+cmake_minimum_required(VERSION 3.16)
+project(gym_cpp)
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(FPGA "Turn on FPGA related code build" OFF)
 
 find_package(Python COMPONENTS Interpreter Development)
 include_directories(${PYTHON_INCLUDE_DIRS})
@@ -28,36 +28,21 @@ set(CMAKE_PREFIX_PATH "${LIBTORCH};${CONDA_PATH}")
 find_package(pybind11 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Torch REQUIRED)
+find_package(cppzmq REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXXTORCH_CXX_FLAGS_FLAGS} -O3 -Wall -Wextra -Wno-unused-parameter")
 
+set(gym_cpp_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
-add_subdirectory(Google_tests)
-
-add_subdirectory(gym_cpp)
-
-include_directories("libs/include" "libs_fpga/include" "${TORCH_INCLUDE_DIRS}" "${gym_cpp_SOURCE_DIR}/include" "third_party")
+include_directories("${gym_cpp_SOURCE_DIR}/include" "${TORCH_INCLUDE_DIRS}" "${gym_cpp_SOURCE_DIR}/third_party")
 link_directories(${CONDA_PATH}/lib)
 
-add_subdirectory(libs)
+set(SOURCE
+        src/envs/env.cpp
+        src/spaces/space.cpp
+        src/gym.cpp)
 
-if (FPGA)
-    message(STATUS "Build with FPGA support")
-    add_definitions(-DUSE_FPGA)
-    add_subdirectory(libs_fpga)
-    include_directories($ENV{XILINX_XRT_INCLUDE} $ENV{XILINX_VIVADO_INCLUDE})
-else ()
-    message(STATUS "Build without FPGA support")
-endif ()
-#add_subdirectory(binding)
+message(STATUS ${gym_cpp_SOURCE_DIR})
 
-set(SOURCE_FILES
-        src/main.cpp
-        )
-
-add_executable(hipc21 ${SOURCE_FILES})
-
-target_link_libraries(hipc21 "${TORCH_LIBRARIES}" fmt::fmt ${PYTHON_LIBRARIES} rlu gym_cpp)
-if (FPGA)
-    target_link_libraries(hipc21 rlu_fpga)
-endif ()
+add_library(gym_cpp SHARED ${SOURCE})
+target_link_libraries(gym_cpp "${TORCH_LIBRARIES}" fmt::fmt cppzmq)
 

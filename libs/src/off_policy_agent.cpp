@@ -18,7 +18,14 @@ namespace rlu::agent {
         this->m_logger = logger;
     }
 
-    OffPolicyAgent::OffPolicyAgent(float tau, float q_lr, float gamma) : tau(tau), q_lr(q_lr), gamma(gamma) {
+    OffPolicyAgent::OffPolicyAgent(std::shared_ptr<gym::space::Space> obs_space,
+                                   std::shared_ptr<gym::space::Space> act_space, float tau, float q_lr, float gamma) :
+            obs_space(std::move(obs_space)),
+            act_space(std::move(act_space)),
+            tau(tau),
+            q_lr(q_lr),
+            gamma(gamma) {
 
     }
+
 }

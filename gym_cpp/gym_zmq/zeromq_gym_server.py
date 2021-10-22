@@ -10,22 +10,9 @@ import tempfile
 import argparse
 import json
 import numpy as np
-import base64
-import io
 import six
 
-
-def encode_numpy(array: np.ndarray) -> str:
-    b = io.BytesIO()
-    np.savez(b, x=array)
-    encoded = base64.b64encode(b.getvalue()).decode('ascii')
-    return encoded
-
-
-def decode_numpy(string: str) -> np.ndarray:
-    decoded = base64.b64decode(string)
-    buffer = io.BytesIO(decoded)
-    return np.load(buffer)['x']
+from .encoding import encode_numpy, decode_numpy
 
 
 def encode_space(space: gym.spaces.Space):
@@ -47,15 +34,20 @@ def encode_space(space: gym.spaces.Space):
     return json.dumps(output)
 
 
-def encode_observation(observation: np.ndarray):
-    return encode_numpy(observation)
+def encode_observation(observation):
+    if isinstance(observation, np.ndarray):
+        return encode_numpy(observation)
+    else:
+        raise ValueError(f"Unknown observation type {type(observation)}")
 
 
 def decode_action(action) -> np.ndarray:
     if isinstance(action, six.integer_types):
         nice_action = action
-    else:
+    elif isinstance(action, str):
         nice_action = decode_numpy(action)
+    else:
+        raise ValueError(f"Unknown encoded action type {type(action)}")
     return nice_action
 
 
@@ -70,9 +62,13 @@ class ZeroMQGymServer(object):
         self.socket.bind(self.url)
         self.env = None
 
-    def __del__(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.socket.unbind(self.url)
-        os.remove(self.file)
+        if self.file is not None:
+            os.remove(self.file)
 
     def handle_query(self, query):
         query = json.loads(query)
@@ -120,5 +116,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--port', default=5000, type=int, help='port to bind to')
     args = parser.parse_args()
-    server = ZeroMQGymServer(port=args.port)
-    server.run()
+    with ZeroMQGymServer(port=args.port) as server:
+        server.run()

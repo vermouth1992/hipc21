@@ -7,7 +7,8 @@
 
 #include "torch/torch.h"
 #include <optional>
-#include "gym/gym.h"
+#include <utility>
+#include "gym_cpp/spaces/space.h"
 #include "logger.h"
 #include "type.h"
 #include "replay_buffer/replay_buffer_base.h"
@@ -18,7 +19,9 @@ namespace rlu::agent {
     // define a template class for general off-policy agent
     class OffPolicyAgent : public torch::nn::Module {
     public:
-        explicit OffPolicyAgent(float tau, float q_lr, float gamma);
+        explicit OffPolicyAgent(std::shared_ptr<gym::space::Space> obs_space,
+                                std::shared_ptr<gym::space::Space> act_space,
+                                float tau, float q_lr, float gamma);
 
         void update_target_q(bool soft);
 
@@ -59,6 +62,8 @@ namespace rlu::agent {
         virtual torch::Tensor act_single(const torch::Tensor &obs, bool exploration) = 0;
 
     protected:
+        const std::shared_ptr<gym::space::Space> obs_space;
+        const std::shared_ptr<gym::space::Space> act_space;
         torch::nn::AnyModule q_network;
         torch::nn::AnyModule target_q_network;
         float tau{};

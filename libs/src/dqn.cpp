@@ -6,20 +6,21 @@
 
 namespace rlu::agent {
 
-    DQN::DQN(const Gym::Space &obs_space,
-             const Gym::Space &act_space,
+    DQN::DQN(const std::shared_ptr<gym::space::Space> &obs_space,
+             const std::shared_ptr<gym::space::Space> &act_space,
              int64_t mlp_hidden,
              int64_t num_layers,
              float q_lr, float gamma, float tau, bool double_q, float epsilon_greedy) :
-            OffPolicyAgent(tau, q_lr, gamma),
-            m_act_dim(act_space.discreet_n),
+            OffPolicyAgent(obs_space, act_space, tau, q_lr, gamma),
             m_double_q(double_q),
             m_epsilon_greedy(epsilon_greedy) {
-        M_Assert(act_space.type == Gym::Space::DISCRETE, "Only support discrete action space");
+        auto discrete_action_space = std::dynamic_pointer_cast<gym::space::Discrete>(act_space);
+        auto box_observation_space = std::dynamic_pointer_cast<gym::space::Box>(obs_space);
+        m_act_dim = discrete_action_space->get_n();
 
-        if (obs_space.box_shape.size() == 1) {
-            int64_t obs_dim = obs_space.box_shape[0];
-            int64_t act_dim = act_space.discreet_n;
+        if (box_observation_space->get_shape().size() == 1) {
+            int64_t obs_dim = box_observation_space->get_shape().at(0);
+            int64_t act_dim = m_act_dim;
             this->q_network = register_module("q_network",
                                               rlu::nn::build_mlp(obs_dim, act_dim, mlp_hidden, num_layers));
             this->target_q_network = register_module("target_q_network",

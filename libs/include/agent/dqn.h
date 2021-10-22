@@ -7,7 +7,6 @@
 
 #include <torch/torch.h>
 #include <utility>
-#include "gym/gym.h"
 #include "replay_buffer/replay_buffer_base.h"
 #include "common.h"
 #include "agent/off_policy_agent.h"
@@ -21,8 +20,8 @@ namespace rlu::agent {
 
     class DQN : public OffPolicyAgent {
     public:
-        explicit DQN(const Gym::Space &obs_space,
-                     const Gym::Space &act_space,
+        explicit DQN(const std::shared_ptr<gym::space::Space> &obs_space,
+                     const std::shared_ptr<gym::space::Space> &act_space,
                      int64_t mlp_hidden = 64,
                      int64_t num_layers = 2,
                      float q_lr = 1e-3,

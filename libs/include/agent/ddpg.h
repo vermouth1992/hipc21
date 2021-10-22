@@ -14,8 +14,8 @@ namespace rlu::agent {
      */
     class DDPGAgent : public TD3Agent {
     public:
-        explicit DDPGAgent(const Gym::Space &obs_space,
-                           const Gym::Space &act_space,
+        explicit DDPGAgent(const std::shared_ptr<gym::space::Space> &obs_space,
+                           const std::shared_ptr<gym::space::Space> &act_space,
                            int64_t policy_mlp_hidden = 64,
                            float policy_lr = 1e-3,
                            int64_t q_mlp_hidden = 64,

@@ -6,23 +6,23 @@
 
 namespace rlu::agent {
 
-    TD3Agent::TD3Agent(const Gym::Space &obs_space,
-                       const Gym::Space &act_space,
+    TD3Agent::TD3Agent(const std::shared_ptr<gym::space::Space> &obs_space,
+                       const std::shared_ptr<gym::space::Space> &act_space,
                        int64_t policy_mlp_hidden,
                        float policy_lr,
                        int64_t q_mlp_hidden,
                        int64_t num_q_ensembles,
                        float q_lr, float tau, float gamma, float actor_noise, float target_noise,
-                       float noise_clip) : OffPolicyAgent(tau, q_lr, gamma),
+                       float noise_clip) : OffPolicyAgent(obs_space, act_space, tau, q_lr, gamma),
                                            actor_noise(actor_noise),
                                            target_noise(target_noise),
-                                           noise_clip(noise_clip),
-                                           act_lim(act_space.box_high.index({0}).item<float>()) {
-
-        M_Assert(act_space.type == Gym::Space::BOX, "Only support continuous action space");
-        if (act_space.box_shape.size() == 1 && obs_space.box_shape.size() == 1) {
-            int64_t obs_dim = obs_space.box_shape[0];
-            int64_t act_dim = act_space.box_shape[0];
+                                           noise_clip(noise_clip) {
+        auto box_action_space = std::dynamic_pointer_cast<gym::space::Box>(act_space);
+        auto box_observation_space = std::dynamic_pointer_cast<gym::space::Box>(obs_space);
+        act_lim = box_action_space->get_high().index({0}).item<float>();
+        if (box_action_space->get_shape().size() == 1 && box_observation_space->get_shape().size() == 1) {
+            int64_t obs_dim = box_observation_space->get_shape().at(0);
+            int64_t act_dim = box_action_space->get_shape().at(0);
             this->q_network = register_module("q_network",
                                               std::make_shared<rlu::nn::EnsembleMinQNet>(obs_dim, act_dim,
                                                                                          q_mlp_hidden,
