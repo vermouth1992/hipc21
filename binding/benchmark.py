@@ -3,7 +3,7 @@ import sumtree
 import timeit
 
 if __name__ == '__main__':
-    capacity = [1000, 10000, 100000, 1000000, 10000000]
+    capacity = [1000, 10000, 100000, 1000000, 10000000, 100000000]
     K = [2, 4, 8, 16, 32, 64]
     batch_size = [32, 64, 128, 256, 512]
     iterations = 1000
