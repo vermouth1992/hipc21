@@ -48,7 +48,7 @@ if (FPGA)
 else ()
     message(STATUS "Build without FPGA support")
 endif ()
-#add_subdirectory(binding)
+add_subdirectory(binding)
 
 set(SOURCE_FILES
         src/main.cpp

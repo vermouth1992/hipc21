@@ -44,3 +44,4 @@ if __name__ == '__main__':
     import pandas as pd
 
     dataframe = pd.DataFrame(data)
+    dataframe.to_csv("sumtree.csv", index=False)

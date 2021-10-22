@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <cmath>
 #include <iostream>
-#include "fmt/format.h"
 
 constexpr bool is_power_of2(int v) {
     return v && ((v & (v - 1)) == 0);
@@ -18,9 +17,9 @@ constexpr bool is_power_of2(int v) {
 
 static inline void M_Assert_(const char *expr_str, bool expr, const char *file, int line, const char *msg) {
     if (!expr) {
-        auto error_msg = fmt::format("Assert failed:\t{}\nExpected:\t{}\nSource:\t\t{}, line {}\n", msg, expr_str, file,
-                                     line);
-        throw std::runtime_error(error_msg);
+//        auto error_msg = fmt::format("Assert failed:\t{}\nExpected:\t{}\nSource:\t\t{}, line {}\n", msg, expr_str, file,
+//                                     line);
+        throw std::runtime_error("error");
     }
 }
 
