@@ -10,7 +10,7 @@
 namespace rlu::replay_buffer {
     class SegmentTreeNary : public SegmentTree {
     public:
-        explicit SegmentTreeNary(int64_t size, int64_t n = 8);
+        explicit SegmentTreeNary(int64_t size, int64_t n = 16);
 
         virtual ~SegmentTreeNary() { delete[]m_values; }
 

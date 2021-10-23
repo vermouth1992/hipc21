@@ -65,7 +65,7 @@ namespace rlu::trainer {
                 {"done",     DataSpec({}, torch::kFloat32)},
         };
 
-        this->buffer = std::make_shared<replay_buffer::PrioritizedReplayBuffer<replay_buffer::SegmentTreeTorch>>(
+        this->buffer = std::make_shared<replay_buffer::PrioritizedReplayBuffer<replay_buffer::SegmentTreeNary>>(
                 replay_size, data_spec, batch_size, 0.6);
         this->temp_buffer.push_back(std::make_shared<replay_buffer::UniformReplayBuffer>(batch_size, data_spec, 1));
     }
