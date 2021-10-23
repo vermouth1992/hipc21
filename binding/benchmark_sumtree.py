@@ -2,6 +2,7 @@ from ray.rllib.execution.segment_tree import SumSegmentTree
 import numpy as np
 import sumtree
 import timeit
+from tianshou.data.buffer.prio import SegmentTree
 
 
 def insert_ray_tree(tree: SumSegmentTree, capacity, batch_size):
@@ -15,6 +16,17 @@ def sample_ray_tree(tree: SumSegmentTree, batch_size):
     data = np.random.rand(batch_size) * tree.reduce()
     for d in data:
         tree.find_prefixsum_idx(d)
+
+
+def insert_tianshou(tree: SegmentTree, capacity, batch_size):
+    idx = np.random.randint(capacity, size=batch_size)
+    priority = np.random.rand(batch_size)
+    tree[idx] = priority
+
+
+def sample_tianshou(tree: SegmentTree, batch_size):
+    data = np.random.rand(batch_size) * tree.reduce()
+    tree.get_prefix_sum_idx(data)
 
 
 def insert_our(tree, capacity, batch_size):
@@ -41,24 +53,28 @@ if __name__ == '__main__':
             "Sampling": []}
 
     tree_ray = SumSegmentTree
+    tree_tianshou = SegmentTree
     tree_our = lambda c: sumtree.SumTreefloat(c, 16)
 
     insert_fn_dict = {
         tree_ray: insert_ray_tree,
+        tree_tianshou: insert_tianshou,
         tree_our: insert_our
     }
 
     sample_fn_dict = {
         tree_ray: sample_ray_tree,
+        tree_tianshou: sample_tianshou,
         tree_our: sample_our
     }
 
     tree_str_dict = {
         tree_ray: "rllib",
+        tree_tianshou: "tianshou",
         tree_our: "ours"
     }
 
-    for tree_fn in [tree_ray, tree_our]:
+    for tree_fn in [tree_ray, tree_tianshou, tree_our]:
 
         for c in capacity:
 
