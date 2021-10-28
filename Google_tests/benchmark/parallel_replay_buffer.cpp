@@ -13,6 +13,7 @@
 #include <utility>
 #include <thread>
 #include <mutex>
+#include <chrono>
 #include "utils/stop_watcher.h"
 
 class BenchmarkReplayBuffer {
@@ -24,14 +25,16 @@ public:
             num_actors(num_actors), num_learners(num_learners), buffer(std::move(buffer)) {
         actor_idx = 0;
         learner_idx = 0;
+        inference_steps = 0;
+        learning_steps = 0;
     }
 
     void run() {
         for (int i = 0; i < num_actors; i++) {
-            actor_threads.push_back(std::thread(&BenchmarkReplayBuffer::actor_fn, this));
+            actor_threads.emplace_back(&BenchmarkReplayBuffer::actor_fn, this);
         }
         for (int j = 0; j < num_learners; j++) {
-            learner_threads.push_back(std::thread(&BenchmarkReplayBuffer::learner_fn, this));
+            learner_threads.emplace_back(&BenchmarkReplayBuffer::learner_fn, this);
         }
         for (auto &t: actor_threads) {
             t.join();
@@ -41,14 +44,38 @@ public:
         }
     }
 
+    [[nodiscard]] rlu::str_to_tensor inference() const {
+        std::this_thread::sleep_for(std::chrono::milliseconds(inference_time));
+        // generate random data
+        return {}
+    }
+
     void actor_fn() {
         int index = atomic_increase_get_index(actor_idx_mutex, actor_idx);
         std::cout << "Actor " << index << " running" << std::endl;
+
+        while (true) {
+            // perform inference
+            auto data = inference();
+            // insert into the replay buffer as a batch
+            buffer->add_batch(data);
+            // increment the global iteration index
+
+
+            // wait for the learner if it is too fast
+        }
     }
 
     void learner_fn() {
         int index = atomic_increase_get_index(learner_idx_mutex, learner_idx);
         std::cout << "Learner " << index << " running" << std::endl;
+
+        // sample data
+
+        // perform learning
+
+        // update the priority
+
     }
 
 private:
@@ -62,11 +89,16 @@ private:
         return temp;
     }
 
-    // global variables
+    // global variables to assign thread index
     int actor_idx;
     int learner_idx;
     std::mutex actor_idx_mutex;
     std::mutex learner_idx_mutex;
+    // global variables to measure the training progress
+    int inference_steps;
+    int learning_steps;
+    std::mutex inference_steps_mutex;
+    std::mutex learning_steps_mutex;
     // threads
     std::vector<std::thread> actor_threads;
     std::vector<std::thread> learner_threads;
