@@ -1,30 +1,38 @@
 //
-// Created by Chi Zhang on 9/21/21.
+// Created by chi on 10/29/21.
 //
 
-#ifndef HIPC21_PRIORITIZED_REPLAY_BUFFER_H
-#define HIPC21_PRIORITIZED_REPLAY_BUFFER_H
+#ifndef HIPC21_PRIORITIZED_REPLAY_BUFFER_GLOBAL_H
+#define HIPC21_PRIORITIZED_REPLAY_BUFFER_GLOBAL_H
+
+/*
+ * Prioritized Replay Buffer with global synchronization.
+ */
 
 #include "replay_buffer_base.h"
 #include "segment_tree.h"
+#include "thread"
 
 namespace rlu::replay_buffer {
 
     template<class SegmentTreeClass>
-    class PrioritizedReplayBuffer final : public ReplayBuffer {
+    class PrioritizedReplayBufferGlobalLock final : public ReplayBuffer {
     public:
-        explicit PrioritizedReplayBuffer(int64_t capacity, const str_to_dataspec &data_spec, int64_t batch_size,
-                                         float alpha) : ReplayBuffer(capacity, data_spec, batch_size),
-                                                        m_alpha(alpha),
-                                                        m_max_priority(1.0),
-                                                        m_min_priority(1.0) {
+        explicit PrioritizedReplayBufferGlobalLock(int64_t capacity, const str_to_dataspec &data_spec,
+                                                   int64_t batch_size,
+                                                   float alpha) : ReplayBuffer(capacity, data_spec, batch_size),
+                                                                  m_alpha(alpha),
+                                                                  m_max_priority(1.0),
+                                                                  m_min_priority(1.0) {
             m_segment_tree = std::make_shared<SegmentTreeClass>(capacity);
         }
 
         str_to_tensor sample() override {
+            global_mutex.lock();
             auto idx = generate_idx();
             auto data = this->operator[](idx);
             data["idx"] = idx;
+            global_mutex.unlock();
             return data;
         }
 
@@ -51,12 +59,15 @@ namespace rlu::replay_buffer {
             m_min_priority = std::min(m_min_priority, torch::min(priorities).item().toFloat());
             auto new_priority = torch::pow(torch::abs(priorities + 1e-2), m_alpha);
             m_segment_tree->set(idx, new_priority);
+
         };
 
         void post_process(str_to_tensor &data) override {
             auto idx = data.at("idx");
             auto priorities = data.at("priority");
+            global_mutex.lock();
             this->update_priorities(idx, priorities);
+            global_mutex.unlock();
         }
 
         void add_batch(str_to_tensor &data) override {
@@ -76,6 +87,8 @@ namespace rlu::replay_buffer {
             int64_t batch_size = data.begin()->second.sizes()[0];
             // update priority
             torch::Tensor idx;
+
+            global_mutex.lock();
             if (m_ptr + batch_size > capacity()) {
                 idx = torch::cat({torch::arange(m_ptr, capacity()), torch::arange(batch_size - (capacity() - m_ptr))},
                                  0);
@@ -84,6 +97,7 @@ namespace rlu::replay_buffer {
             }
             this->update_priorities(idx, priorities);
             ReplayBuffer::add_batch(data);
+            global_mutex.unlock();
         }
 
     private:
@@ -91,8 +105,8 @@ namespace rlu::replay_buffer {
         float m_alpha;
         float m_max_priority;
         float m_min_priority;
+        std::mutex global_mutex;
     };
 }
 
-
-#endif //HIPC21_PRIORITIZED_REPLAY_BUFFER_H
+#endif //HIPC21_PRIORITIZED_REPLAY_BUFFER_GLOBAL_H

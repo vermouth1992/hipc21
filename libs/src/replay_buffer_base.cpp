@@ -39,13 +39,13 @@ namespace rlu::replay_buffer {
 
     // get data by index
     str_to_tensor ReplayBuffer::operator[](const torch::Tensor &idx) const {
-        auto max_idx = torch::max(idx).item<int64_t>();
-        if (max_idx >= this->size()) {
-            auto message = fmt::format("Accessing invalid index {}. The size of the replay buffer is {}",
-                                       max_idx,
-                                       size());
-            throw std::runtime_error(message);
-        }
+//        auto max_idx = torch::max(idx).item<int64_t>();
+//        if (max_idx >= this->size()) {
+//            auto message = fmt::format("Accessing invalid index {}. The size of the replay buffer is {}",
+//                                       max_idx,
+//                                       size());
+//            throw std::runtime_error(message);
+//        }
         str_to_tensor output;
         for (auto &it: m_storage) {
             output[it.first] = it.second.index({idx});
