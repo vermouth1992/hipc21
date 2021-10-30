@@ -187,7 +187,7 @@ TEST(replay_buffer, synchronization) {
     output_file << "type,num_actors,num_learners,time\n";
 
     for (auto &num_actors: num_actors_lst) {
-        int num_learners = num_actors / 4;
+        int num_learners = num_actors / 2;
         rlu::str_to_dataspec data_spec{
                 {"obs",      rlu::DataSpec({obs_dim}, torch::kFloat32)},
                 {"act",      rlu::DataSpec({act_dim}, torch::kFloat32)},
