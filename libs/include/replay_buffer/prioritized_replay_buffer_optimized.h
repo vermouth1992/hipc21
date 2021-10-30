@@ -20,22 +20,24 @@ namespace rlu::replay_buffer {
     public:
         explicit PrioritizedReplayBufferOpt(int64_t capacity, const str_to_dataspec &data_spec,
                                             int64_t batch_size,
-                                            float alpha) : ReplayBuffer(capacity, data_spec, batch_size),
-                                                           m_alpha(alpha),
-                                                           m_max_priority(1.0),
-                                                           m_min_priority(1.0) {
+                                            float alpha, int total_num_threads) : ReplayBuffer(capacity, data_spec,
+                                                                                               batch_size),
+                                                                                  m_alpha(alpha),
+                                                                                  m_max_priority(1.0),
+                                                                                  m_min_priority(1.0) {
             m_segment_tree = std::make_shared<SegmentTreeClass>(capacity);
+            for (int i = 0; i < total_num_threads; i++) {
+                mutexes.push_back(std::make_unique<std::mutex>());
+            }
         }
 
 
-        str_to_tensor sample() override {
-            this->add_mutex();
-
+        str_to_tensor sample(int i) override {
             // only lock index generation
-            this->lock_mutex();
+            this->lock_mutex(i);
             // generate index can run in parallel, but not with update priority
             auto idx = generate_idx();
-            this->unlock_mutex();
+            this->unlock_mutex(i);
             // update the priority to zero to avoid sampling by other threads
             // to need to reverse it because the priority will be updated anyway.
             this->lock_all_mutex();
@@ -97,43 +99,25 @@ namespace rlu::replay_buffer {
             this->add_batch(data, priorities);
         };
 
-        void add_mutex() {
-            std::thread::id this_id = std::this_thread::get_id();
-            thread_mutex.lock();
-            if (!this->mutexes.contains(this_id)) {
-                mutexes[this_id] = std::make_unique<std::mutex>();
-            }
-            thread_mutex.unlock();
-        }
 
         void lock_all_mutex() {
-            thread_mutex.lock();
             for (auto &mutexe: mutexes) {
-                mutexe.second->lock();
+                mutexe->lock();
             }
-            thread_mutex.unlock();
         }
 
         void unlock_all_mutex() {
-            thread_mutex.lock();
             for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
-                p->second->unlock();
+                (*p)->unlock();
             }
-            thread_mutex.unlock();
         }
 
-        void lock_mutex() {
-            std::thread::id this_id = std::this_thread::get_id();
-            thread_mutex.lock();
-            this->mutexes.at(this_id)->lock();
-            thread_mutex.unlock();
+        void lock_mutex(int i) {
+            this->mutexes.at(i)->lock();
         }
 
-        void unlock_mutex() {
-            std::thread::id this_id = std::this_thread::get_id();
-            thread_mutex.lock();
-            this->mutexes.at(this_id)->unlock();
-            thread_mutex.unlock();
+        void unlock_mutex(int i) {
+            this->mutexes.at(i)->unlock();
         }
 
         void add_batch(str_to_tensor &data, torch::Tensor &priorities) {
@@ -161,8 +145,7 @@ namespace rlu::replay_buffer {
         float m_alpha;
         float m_max_priority;
         float m_min_priority;
-        std::map<std::thread::id, std::unique_ptr<std::mutex>> mutexes;
-        std::mutex thread_mutex;
+        std::vector<std::unique_ptr<std::mutex>> mutexes;
     };
 }
 

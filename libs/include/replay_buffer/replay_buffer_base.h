@@ -24,7 +24,7 @@ namespace rlu::replay_buffer {
         // pure virtual function
         [[nodiscard]] virtual torch::Tensor generate_idx() const = 0;
 
-        virtual str_to_tensor sample();
+        virtual str_to_tensor sample(int i);
 
         void reset();
 

@@ -19,7 +19,7 @@ namespace rlu::replay_buffer {
         reset();
     }
 
-    str_to_tensor ReplayBuffer::sample() {
+    str_to_tensor ReplayBuffer::sample(int i) {
         auto idx = generate_idx();
         return this->operator[](idx);
     }

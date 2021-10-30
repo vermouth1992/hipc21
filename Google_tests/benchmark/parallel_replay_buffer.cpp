@@ -121,7 +121,7 @@ public:
             cv.notify_all();
             if (global_steps > total_steps) break;
             // sample data
-            auto data = this->buffer->sample();
+            auto data = this->buffer->sample(0);
             // perform learning
             auto log = this->learn(data);
             log["idx"] = data["idx"];
@@ -212,7 +212,7 @@ TEST(replay_buffer, synchronization) {
         output_file << "NoLock," << num_actors << "," << num_learners << "," << result << std::endl;
 
         std::shared_ptr<rlu::replay_buffer::ReplayBuffer> buffer_sync_opt = std::make_shared<rlu::replay_buffer::PrioritizedReplayBufferOpt<rlu::replay_buffer::SegmentTreeNary>>(
-                replay_size, data_spec, batch_size, 0.6
+                replay_size, data_spec, batch_size, 0.6, num_actors + num_learners
         );
         BenchmarkReplayBuffer b2(num_actors, num_learners, training_time, inference_time);
         b2.set_buffer(buffer_sync_opt);

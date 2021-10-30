@@ -27,7 +27,7 @@ namespace rlu::replay_buffer {
             m_segment_tree = std::make_shared<SegmentTreeClass>(capacity);
         }
 
-        str_to_tensor sample() override {
+        str_to_tensor sample(int i) override {
             global_mutex.lock();
             auto idx = generate_idx();
             auto data = this->operator[](idx);
