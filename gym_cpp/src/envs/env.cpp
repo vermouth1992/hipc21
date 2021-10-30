@@ -45,6 +45,10 @@ namespace gym::env {
         return env_name;
     }
 
+    Env::~Env() {
+
+    }
+
     ZMQEnv::ZMQEnv(const std::string &env_name) :
             Env(env_name),
             temp_dir(fs::temp_directory_path() / "gym") {

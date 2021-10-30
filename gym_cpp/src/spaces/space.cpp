@@ -49,4 +49,8 @@ namespace gym::space {
     int64_t Discrete::get_n() const {
         return n;
     }
+
+    Space::~Space() {
+
+    }
 }

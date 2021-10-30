@@ -29,30 +29,19 @@ namespace rlu::replay_buffer {
 
 
         str_to_tensor sample() override {
-            std::thread::id this_id = std::this_thread::get_id();
-            thread_mutex.lock();
-            if (!this->mutexes.contains(this_id)) {
-                mutexes[this_id] = std::make_unique<std::mutex>();
-            }
-            thread_mutex.unlock();
+            this->add_mutex();
 
             // only lock index generation
-            mutexes.at(this_id)->lock();
+            this->lock_mutex();
             // generate index can run in parallel, but not with update priority
             auto idx = generate_idx();
-            mutexes.at(this_id)->unlock();
+            this->unlock_mutex();
             // update the priority to zero to avoid sampling by other threads
             // to need to reverse it because the priority will be updated anyway.
-            for (auto p = mutexes.begin(); p != mutexes.end(); p++) {
-                p->second->lock();
-            }
+            this->lock_all_mutex();
             this->update_priorities(idx, torch::zeros({this->m_batch_size},
                                                       torch::TensorOptions().dtype(torch::kFloat32)));
-            for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
-                p->second->unlock();
-            }
-
-
+            this->unlock_all_mutex();
             auto data = this->operator[](idx);
             data["idx"] = idx;
 
@@ -89,14 +78,10 @@ namespace rlu::replay_buffer {
             auto idx = data.at("idx");
             auto priorities = data.at("priority");
 
-            for (auto p = mutexes.begin(); p != mutexes.end(); p++) {
-                p->second->lock();
-            }
+            lock_all_mutex();
             // no need to lock
             this->update_priorities(idx, priorities);
-            for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
-                p->second->unlock();
-            }
+            unlock_all_mutex();
         }
 
         void add_batch(str_to_tensor &data) override {
@@ -112,40 +97,63 @@ namespace rlu::replay_buffer {
             this->add_batch(data, priorities);
         };
 
-        void add_batch(str_to_tensor &data, torch::Tensor &priorities) {
+        void add_mutex() {
             std::thread::id this_id = std::this_thread::get_id();
             thread_mutex.lock();
             if (!this->mutexes.contains(this_id)) {
                 mutexes[this_id] = std::make_unique<std::mutex>();
             }
             thread_mutex.unlock();
+        }
 
+        void lock_all_mutex() {
+            thread_mutex.lock();
+            for (auto &mutexe: mutexes) {
+                mutexe.second->lock();
+            }
+            thread_mutex.unlock();
+        }
+
+        void unlock_all_mutex() {
+            thread_mutex.lock();
+            for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
+                p->second->unlock();
+            }
+            thread_mutex.unlock();
+        }
+
+        void lock_mutex() {
+            std::thread::id this_id = std::this_thread::get_id();
+            thread_mutex.lock();
+            this->mutexes.at(this_id)->lock();
+            thread_mutex.unlock();
+        }
+
+        void unlock_mutex() {
+            std::thread::id this_id = std::this_thread::get_id();
+            thread_mutex.lock();
+            this->mutexes.at(this_id)->unlock();
+            thread_mutex.unlock();
+        }
+
+        void add_batch(str_to_tensor &data, torch::Tensor &priorities) {
             int64_t batch_size = data.begin()->second.sizes()[0];
             // update priority
             torch::Tensor idx;
-            for (auto p = mutexes.begin(); p != mutexes.end(); p++) {
-                p->second->lock();
-            }
+
             if (m_ptr + batch_size > capacity()) {
                 idx = torch::cat({torch::arange(m_ptr, capacity()), torch::arange(batch_size - (capacity() - m_ptr))},
                                  0);
             } else {
                 idx = torch::arange(m_ptr, m_ptr + batch_size);
             }
-            for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
-                p->second->unlock();
-            }
+
 
             ReplayBuffer::add_batch(data);
 
-            for (auto p = mutexes.begin(); p != mutexes.end(); p++) {
-                p->second->lock();
-            }
+            lock_all_mutex();
             this->update_priorities(idx, priorities);
-            for (auto p = mutexes.rbegin(); p != mutexes.rend(); p++) {
-                p->second->unlock();
-            }
-
+            unlock_all_mutex();
         }
 
     private:

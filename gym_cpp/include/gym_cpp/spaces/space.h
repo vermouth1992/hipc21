@@ -17,6 +17,8 @@ namespace gym::space {
 
     class Space {
     public:
+        virtual ~Space();
+
         [[nodiscard]] virtual torch::Tensor sample() const = 0;
 
         [[nodiscard]] virtual bool contains(const torch::Tensor &x) const = 0;

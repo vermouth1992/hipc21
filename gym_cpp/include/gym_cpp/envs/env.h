@@ -37,6 +37,8 @@ namespace gym::env {
     public:
         explicit Env(std::string env_name);
 
+        virtual ~Env();
+
         virtual void reset(State &state) = 0;
 
         virtual void step(const torch::Tensor &action, State &state) = 0;
